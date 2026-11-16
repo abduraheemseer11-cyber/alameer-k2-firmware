@@ -7,7 +7,7 @@
 -firewall4
 -nftables
 -kmod-nft-offload
--wpad-basic-wolfssl
+-wpad-basic-mbedtls
 wpad-mesh-wolfssl
 luci-base
 luci-mod-network
