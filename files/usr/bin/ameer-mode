@@ -12,6 +12,7 @@ NAME=$(g ssid); VLAN=$(g vlan_enabled); VID=$(g vlan_id)
 PASSEN=$(g pass_enabled); PASS=$(g password)
 BAND=$(g band); [ -z "$BAND" ] && BAND=5g
 
+logger -t ameer "apply type=$TYPE ssid=${NAME:-default} ip=$IP/$MASK vlan=${VLAN:-0}:$VID pass=${PASSEN:-0}"
 cp $D/network.base  /etc/config/network
 cp $D/wireless.base /etc/config/wireless
 
@@ -71,11 +72,12 @@ for r in $(uci show wireless | sed -n 's/^wireless\.\(radio[0-9]*\)=wifi-device$
     *2g*|*11g*) cur=2g; HT="$HTMODE_2G"; DEF="$SSID_2G"; SUF="_2G" ;;
     *)          cur=5g; HT="$HTMODE_5G"; DEF="$SSID_5G"; SUF="_5G" ;;
   esac
-  if [ -n "$NAME" ]; then S="${NAME}${SUF}"; else S="$DEF"; fi
+  S="${NAME:-$DEF}"
+  case "$cur" in 2g) CH="$CHANNEL_2G" ;; *) CH="$CHANNEL_5G" ;; esac
 
   uci set wireless.$r.disabled='0'
   uci set wireless.$r.country="$COUNTRY"
-  uci set wireless.$r.channel='auto'
+  uci set wireless.$r.channel="${CH:-auto}"
   uci set wireless.$r.htmode="$HT"
 
   I="default_$r"
@@ -106,6 +108,7 @@ for r in $(uci show wireless | sed -n 's/^wireless\.\(radio[0-9]*\)=wifi-device$
         uci set wireless.$C='wifi-iface'
         uci set wireless.$C.device="$r"; uci set wireless.$C.mode='sta'
         uci set wireless.$C.network='lan'; uci set wireless.$C.wds='1'
+        uci set wireless.$r.channel='auto'
         uci set wireless.$C.ssid="$NAME"; uci set wireless.$C.encryption="$ENC"
         [ -n "$KEY" ] && uci set wireless.$C.key="$KEY"
       else
@@ -137,4 +140,4 @@ sync
 if [ -z "$NOREBOOT" ]; then
   (sleep 2; /etc/init.d/network restart) >/dev/null 2>&1 &
 fi
-echo "OK: $TYPE"
+echo "OK: type=$TYPE ssid=${NAME:-default} ip=$IP/$MASK vlan=${VLAN:-0}:$VID"
