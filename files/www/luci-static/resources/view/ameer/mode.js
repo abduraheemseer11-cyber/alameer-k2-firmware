@@ -9,8 +9,20 @@ return view.extend({
 		return this.handleSave(ev).then(function() {
 			ui.showModal('AL-AMEER', [ E('p', { 'class': 'spinning' }, 'جارٍ تطبيق الإعدادات... قد ينقطع الاتصال لثوانٍ، وإذا غيّرت الآي بي ادخل على العنوان الجديد') ]);
 			window.setTimeout(function() { ui.hideModal(); }, 12000);
-			return fs.exec('/usr/bin/ameer-mode');
+			return fs.exec('/usr/bin/ameer-mode').then(function(res) {
+				ui.addNotification(null, E('pre', {}, (res.stdout || '') + (res.stderr || '') + ' (code ' + res.code + ')'));
+			});
 		});
+	},
+
+	addFooter: function(e) {
+		return E([ e, E('div', { 'class': 'cbi-page-actions' }, [
+			E('button', { 'class': 'cbi-button cbi-button-apply important', 'click': ui.createHandlerFn(this, 'handleSaveApply') }, _('Save & Apply')),
+			' ',
+			E('button', { 'class': 'cbi-button cbi-button-save', 'click': ui.createHandlerFn(this, 'handleSave') }, _('Save')),
+			' ',
+			E('button', { 'class': 'cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, 'handleReset') }, _('Reset'))
+		]) ]);
 	},
 
 	render: function() {
@@ -46,8 +58,8 @@ return view.extend({
 
 		o = s.taboption('quick', form.Value, 'ssid', 'إسم الشبكة');
 		o.optional = true;
-		o.placeholder = 'AL-AMEER-NET@  (يُضاف _2G و _5G تلقائياً)';
-		o.description = 'وضع Client: اسم الشبكة التي سيتصل بها الجهاز بالضبط.';
+		o.placeholder = 'اتركه فارغاً للأسماء الافتراضية';
+		o.description = 'يُستخدم نفس الاسم للترددين 2.4GHz و 5GHz. وضع Client: اسم الشبكة التي سيتصل بها الجهاز.';
 
 		o = s.taboption('quick', form.Flag, 'vlan_enabled', 'إضافة فيلان');
 		o.default = '0';
