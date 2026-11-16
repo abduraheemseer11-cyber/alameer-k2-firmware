@@ -1,14 +1,20 @@
-# حزم إضافية (-اسم = حذف حزمة افتراضية)
+# حزم إضافية (-اسم = حذف حزمة افتراضية). لا راوتر/جدار ناري => إقلاع أسرع وفلاش أقل
 -odhcp6c
 -odhcpd-ipv6only
+-ppp
+-ppp-mod-pppoe
+-dnsmasq
+-firewall4
+-nftables
+-kmod-nft-offload
+-wpad-basic-wolfssl
+wpad-mesh-wolfssl
 luci-base
 luci-mod-network
 luci-mod-status
 luci-mod-system
-luci-app-firewall
-luci-theme-bootstrap
+luci-theme-material
 luci-i18n-base-ar
-luci-i18n-firewall-ar
 uhttpd
 uhttpd-mod-ubus
 rpcd

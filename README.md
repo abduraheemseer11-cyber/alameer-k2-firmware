@@ -13,7 +13,9 @@
 
 ## بعد التشغيل
 - الآي بي: `192.168.1.20` — لا توجد كلمة سر لـ root؛ ضع واحدة فوراً (System → Administration).
-- LuCI: Network ← **Quick Setup** (راوتر / أكسس بوينت / مكرر WDS)، أو من SSH: `ameer-mode router|ap|repeater`.
+- LuCI: أول عنصر في القائمة **البرمجة السريعة** (Access Point / Mesh / AP WDS / Client WDS). الإعدادات تُحفظ في `/etc/config/ameer` وتُطبّق بالأمر `ameer-mode`.
+- الشبكتان مفتوحتان بدون كلمة مرور افتراضياً؛ فعّل «تخصيص كلمة مرور Wifi» لوضع كلمة.
+- صور المرجع للشكل المطلوب في `docs/reference/`.
 - VLAN: Network ← Switch، و Multi-SSID: Network ← Wireless ← Add.
 - RAM Cleaner: كرون كل 10 دقائق (`/usr/bin/ram-cleaner`) يفرّغ الكاش عند نقص الذاكرة.
 - Watchdog: `/usr/bin/ameer-watchdog` كل دقيقة (إعادة الواي فاي/الشبكة/الجهاز عند التعليق). إضافةً إلى watchdog العتاد الذي يفعّله procd.
