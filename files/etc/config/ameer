@@ -1,1 +1,12 @@
-
+config ameer 'main'
+	option type 'ap'
+	option ip '192.168.1.20'
+	option netmask '255.255.255.0'
+	option ssid ''
+	option band '5g'
+	option vlan_enabled '0'
+	option vlan_id ''
+	option pass_enabled '0'
+	option password ''
+	option antitheft '0'
+	option format_btn '1'
