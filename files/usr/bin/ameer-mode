@@ -52,5 +52,9 @@ esac
 
 echo "$MODE" > $D/mode
 sync
-(sleep 3; reboot) >/dev/null 2>&1 &
-echo "OK: $MODE - rebooting"
+if [ -z "$NOREBOOT" ]; then
+  (sleep 3; reboot) >/dev/null 2>&1 &
+  echo "OK: $MODE - rebooting"
+else
+  echo "OK: $MODE"
+fi
