@@ -7,10 +7,10 @@ on:
         description: 'OpenWrt version'
         default: '23.05.5'
       profile:
-        description: 'Device profile (PSG1218 revision)'
+        description: 'Device profile (Phicomm PSG1218 / K2)'
         type: choice
-        default: phicomm_psg1218a
-        options: [phicomm_psg1218a, phicomm_psg1218b]
+        default: phicomm_psg1218
+        options: [phicomm_psg1218]
   push:
     branches: [main]
     tags: ['v*']
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       VERSION: ${{ github.event.inputs.openwrt_version || '23.05.5' }}
-      PROFILE: ${{ github.event.inputs.profile || 'phicomm_psg1218a' }}
+      PROFILE: ${{ github.event.inputs.profile || 'phicomm_psg1218' }}
     steps:
       - uses: actions/checkout@v4
 
