@@ -9,8 +9,8 @@ on:
       profile:
         description: 'Device profile (Phicomm PSG1218 / K2)'
         type: choice
-        default: phicomm_psg1218
-        options: [phicomm_psg1218]
+        default: phicomm_k2
+        options: [phicomm_k2]
   push:
     branches: [main]
     tags: ['v*']
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       VERSION: ${{ github.event.inputs.openwrt_version || '23.05.5' }}
-      PROFILE: ${{ github.event.inputs.profile || 'phicomm_psg1218' }}
+      PROFILE: ${{ github.event.inputs.profile || 'phicomm_k2' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,10 +36,24 @@ jobs:
       - name: Download ImageBuilder
         run: |
           BASE=https://downloads.openwrt.org/releases/$VERSION/targets/ramips/mt7620
-          FILE=$(wget -qO- $BASE/ | grep -oE 'openwrt-imagebuilder-[^"<> ]+Linux-x86_64\.tar\.(xz|zst)' | head -1)
+          FILE=$(wget -qO- "$BASE/" | grep -oE 'openwrt-imagebuilder-[^"<> ]+Linux-x86_64\.tar\.(xz|zst)' | head -1)
+          if [ -z "$FILE" ]; then
+            echo "Could not find an ImageBuilder archive at $BASE"
+            exit 1
+          fi
           echo "ImageBuilder: $FILE"
           wget -q "$BASE/$FILE"
-          mkdir ib && tar -xf "$FILE" -C ib --strip-components=1
+          mkdir ib
+          tar -xf "$FILE" -C ib --strip-components=1
+
+      - name: Verify profile
+        run: |
+          cd ib
+          make info
+          if ! make info | grep -Fq "$PROFILE"; then
+            echo "Profile '$PROFILE' is not available in this ImageBuilder."
+            exit 1
+          fi
 
       - name: Build firmware
         run: |
@@ -51,8 +65,15 @@ jobs:
 
       - name: Check size (<= 7.5MB)
         run: |
-          for f in ib/bin/targets/ramips/mt7620/*sysupgrade.bin; do
-            s=$(stat -c%s "$f"); echo "$f = $s bytes"
+          shopt -s nullglob
+          files=(ib/bin/targets/ramips/mt7620/*sysupgrade.bin)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No sysupgrade firmware image was produced."
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            s=$(stat -c%s "$f")
+            echo "$f = $s bytes"
             [ "$s" -le 7864320 ] || { echo "Image too large"; exit 1; }
           done
 
