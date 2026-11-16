@@ -3,3 +3,11 @@
 .cbi-button-apply,.cbi-button-action.important{background-color:#4a3f8f!important;color:#fff!important}
 .cbi-button-save{background-color:#566b2e!important;color:#fff!important}
 .cbi-button-reset{background-color:#ff8c00!important;color:#fff!important}
+
+/* الشريط العلوي: أحمر غامق */
+:root,:root[data-darkmode="true"]{
+  --primary-color-high:#8b0000;--primary-color-medium:#8b0000;--primary-color-low:#a31515;
+  --dark-primary-color-high:#8b0000;--dark-primary-color-medium:#8b0000;--dark-primary-color-low:#a31515;
+}
+header,header.sticky,body>header,.main>header{background-color:#8b0000!important;color:#fff!important}
+header *{color:#fff}
