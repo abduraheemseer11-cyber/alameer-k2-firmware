@@ -1,0 +1,19 @@
+#!/bin/sh
+# watchdog: wifi down -> wifi reload ; gateway unreachable -> wifi reload (3) / network restart (6) / reboot (12)
+S=/tmp/ameer-wd; mkdir -p $S
+up=$(cut -d. -f1 /proc/uptime)
+[ "$up" -lt 180 ] && exit 0
+
+if ! iw dev 2>/dev/null | grep -q Interface; then
+  logger -t ameer-watchdog "no wifi interface, reloading wifi"; wifi reload
+fi
+
+gw=$(ip route show default 2>/dev/null | awk 'NR==1{print $3}')
+[ -z "$gw" ] && exit 0
+if ping -c2 -W2 "$gw" >/dev/null 2>&1; then echo 0 > $S/fail; exit 0; fi
+n=$(( $(cat $S/fail 2>/dev/null || echo 0) + 1 )); echo $n > $S/fail
+case $n in
+  3)  logger -t ameer-watchdog "gateway down x3: wifi reload"; wifi reload ;;
+  6)  logger -t ameer-watchdog "gateway down x6: network restart"; /etc/init.d/network restart ;;
+  12) logger -t ameer-watchdog "gateway down x12: reboot"; reboot ;;
+esac

@@ -1,0 +1,57 @@
+#!/bin/sh
+. /etc/ameer/defaults.conf
+
+uci set system.@system[0].hostname="$HOSTNAME"
+uci set system.@system[0].timezone="$TIMEZONE"
+uci commit system
+
+uci set network.lan.ipaddr="$LAN_IP"
+uci set network.lan.netmask='255.255.255.0'
+uci -q delete network.lan.ip6assign
+uci -q delete network.globals.ula_prefix
+uci commit network
+
+uci -q set dhcp.lan.dhcpv6='disabled'
+uci -q set dhcp.lan.ra='disabled'
+uci commit dhcp
+
+[ -s /etc/config/wireless ] || wifi config
+for r in $(uci show wireless | sed -n 's/^wireless\.\(radio[0-9]*\)=wifi-device$/\1/p'); do
+  band="$(uci -q get wireless.$r.band)$(uci -q get wireless.$r.hwmode)"
+  case "$band" in
+    *2g*|*11g*) SSID="$SSID_2G"; HT="$HTMODE_2G" ;;
+    *)          SSID="$SSID_5G"; HT="$HTMODE_5G" ;;
+  esac
+  uci set wireless.$r.disabled='0'
+  uci set wireless.$r.country="$COUNTRY"
+  uci set wireless.$r.channel='auto'
+  uci set wireless.$r.htmode="$HT"
+  I="default_$r"
+  uci -q get wireless.$I >/dev/null || { uci set wireless.$I='wifi-iface'; uci set wireless.$I.device="$r"; uci set wireless.$I.network='lan'; uci set wireless.$I.mode='ap'; }
+  uci set wireless.$I.ssid="$SSID"
+  uci set wireless.$I.encryption='psk2+ccmp'
+  uci set wireless.$I.key="$WIFI_KEY"
+done
+uci commit wireless
+
+uci -q delete lldpd.config
+uci set lldpd.config=lldpd
+uci set lldpd.config.enable_cdp='1'
+uci set lldpd.config.enable_fdp='0'
+uci set lldpd.config.enable_sonmp='0'
+uci set lldpd.config.enable_edp='0'
+uci set lldpd.config.lldp_description='AL-AMEER Phicomm K2'
+uci set lldpd.config.interface='lan'
+uci commit lldpd
+
+cat > /etc/crontabs/root <<EOC
+*/10 * * * * /usr/bin/ram-cleaner
+* * * * * /usr/bin/ameer-watchdog
+EOC
+/etc/init.d/cron enable
+/etc/init.d/lldpd enable 2>/dev/null
+
+# نسخ احتياطية لوضع الراوتر (يستخدمها ameer-mode)
+for f in network wireless dhcp firewall; do cp /etc/config/$f /etc/ameer/$f.router; done
+echo router > /etc/ameer/mode
+exit 0

@@ -1,0 +1,8 @@
+{
+	"admin/network/ameer-mode": {
+		"title": "Quick Setup - الإعداد السريع",
+		"order": 1,
+		"action": { "type": "view", "path": "ameer/mode" },
+		"depends": { "acl": [ "luci-app-ameer" ] }
+	}
+}

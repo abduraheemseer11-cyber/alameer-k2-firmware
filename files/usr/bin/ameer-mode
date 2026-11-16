@@ -1,0 +1,56 @@
+#!/bin/sh
+# ameer-mode router [pppoe USER PASS] | ap | repeater SSID KEY [2g|5g] | status
+D=/etc/ameer
+MODE="$1"
+
+restore() { for f in network wireless dhcp firewall; do cp $D/$f.router /etc/config/$f; done; }
+
+bridge_wan() {
+  wan="$(uci -q get network.wan.device)"; [ -z "$wan" ] && wan="$(uci -q get network.wan.ifname)"
+  uci -q delete network.wan; uci -q delete network.wan6
+  [ -z "$wan" ] && return
+  sec="$(uci show network | sed -n "s/^network\.\([^.]*\)\.name='br-lan'$/\1/p" | head -1)"
+  if [ -n "$sec" ]; then uci add_list network.$sec.ports="$wan"
+  else uci set network.lan.ifname="$(uci -q get network.lan.ifname) $wan"; fi
+}
+
+ap_services() {
+  uci set dhcp.lan.ignore='1'; uci commit dhcp
+  /etc/init.d/firewall disable; /etc/init.d/dnsmasq disable
+}
+
+case "$MODE" in
+  status) cat $D/mode; exit 0 ;;
+  router)
+    restore
+    if [ "$2" = "pppoe" ]; then
+      uci set network.wan.proto='pppoe'; uci set network.wan.username="$3"; uci set network.wan.password="$4"
+      uci commit network
+    fi
+    /etc/init.d/firewall enable; /etc/init.d/dnsmasq enable ;;
+  ap)
+    restore; bridge_wan; uci commit network; ap_services ;;
+  repeater)
+    SSID="$2"; KEY="$3"; BAND="${4:-2g}"
+    [ -z "$SSID" ] && { echo "usage: ameer-mode repeater SSID KEY [2g|5g]"; exit 1; }
+    restore; bridge_wan; uci commit network; ap_services
+    for r in $(uci show wireless | sed -n 's/^wireless\.\(radio[0-9]*\)=wifi-device$/\1/p'); do
+      b="$(uci -q get wireless.$r.band)$(uci -q get wireless.$r.hwmode)"
+      case "$b" in *2g*|*11g*) cur=2g ;; *) cur=5g ;; esac
+      [ "$cur" = "$BAND" ] || continue
+      uci set wireless.default_$r.wds='1'
+      uci set wireless.sta_$r='wifi-iface'
+      uci set wireless.sta_$r.device="$r"; uci set wireless.sta_$r.mode='sta'
+      uci set wireless.sta_$r.network='lan'; uci set wireless.sta_$r.wds='1'
+      uci set wireless.sta_$r.ssid="$SSID"
+      if [ -n "$KEY" ]; then uci set wireless.sta_$r.encryption='psk2+ccmp'; uci set wireless.sta_$r.key="$KEY"
+      else uci set wireless.sta_$r.encryption='none'; fi
+    done
+    uci commit wireless ;;
+  *) echo "usage: ameer-mode router|ap|repeater|status"; exit 1 ;;
+esac
+
+echo "$MODE" > $D/mode
+sync
+(sleep 3; reboot) >/dev/null 2>&1 &
+echo "OK: $MODE - rebooting"
