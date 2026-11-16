@@ -54,4 +54,7 @@ EOC
 # نسخ احتياطية لوضع الراوتر (يستخدمها ameer-mode)
 for f in network wireless dhcp firewall; do cp /etc/config/$f /etc/ameer/$f.router; done
 echo router > /etc/ameer/mode
+
+# الوضع الافتراضي: LAN فقط، DHCP مغلق، بدون جدار ناري (يمكن تغييره من defaults.conf)
+NOREBOOT=1 /usr/bin/ameer-mode "${DEFAULT_MODE:-ap}"
 exit 0
