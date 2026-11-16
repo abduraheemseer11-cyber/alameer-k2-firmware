@@ -15,14 +15,14 @@ return view.extend({
 		});
 	},
 
-	addFooter: function(e) {
-		return E([ e, E('div', { 'class': 'cbi-page-actions' }, [
+	addFooter: function() {
+		return E('div', { 'class': 'cbi-page-actions' }, [
 			E('button', { 'class': 'cbi-button cbi-button-apply important', 'click': ui.createHandlerFn(this, 'handleSaveApply') }, _('Save & Apply')),
 			' ',
 			E('button', { 'class': 'cbi-button cbi-button-save', 'click': ui.createHandlerFn(this, 'handleSave') }, _('Save')),
 			' ',
 			E('button', { 'class': 'cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, 'handleReset') }, _('Reset'))
-		]) ]);
+		]);
 	},
 
 	render: function() {
