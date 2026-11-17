@@ -1,0 +1,44 @@
+#!/bin/sh
+. /etc/ameer/defaults.conf
+
+uci set system.@system[0].hostname="$HOSTNAME"
+uci set system.@system[0].timezone="$TIMEZONE"
+uci commit system
+
+[ -s /etc/config/wireless ] || wifi config
+for f in network wireless dhcp firewall; do [ -f /etc/config/$f ] && cp /etc/config/$f /etc/ameer/$f.base; done
+
+# واجهة LuCI: ثيم material، اللغة الإنجليزية، HTTP منفذ 80 فقط
+uci -q set luci.main.mediaurlbase='/luci-static/material'
+uci -q set luci.main.lang='en'
+uci commit luci
+uci -q delete uhttpd.main.listen_https
+uci -q delete uhttpd.main.listen_http
+uci add_list uhttpd.main.listen_http='0.0.0.0:80'
+uci set uhttpd.main.redirect_https='0'
+uci commit uhttpd
+
+CSS=/www/luci-static/material/cascade.css
+[ -f $CSS ] && ! grep -q 'AL-AMEER-THEME' $CSS && cat /etc/ameer/theme.css >> $CSS
+
+uci -q delete lldpd.config
+uci set lldpd.config=lldpd
+uci set lldpd.config.enable_cdp='1'
+uci set lldpd.config.enable_fdp='0'
+uci set lldpd.config.enable_sonmp='0'
+uci set lldpd.config.enable_edp='0'
+uci set lldpd.config.lldp_description='AL-AMEER Phicomm K2'
+uci set lldpd.config.interface='lan'
+uci commit lldpd
+
+cat > /etc/crontabs/root <<EOC
+*/10 * * * * /usr/bin/ram-cleaner
+* * * * * /usr/bin/ameer-watchdog
+EOC
+/etc/init.d/cron enable
+/etc/init.d/lldpd enable 2>/dev/null
+
+for s in sysntpd odhcpd dnsmasq firewall; do [ -x /etc/init.d/$s ] && /etc/init.d/$s disable; done
+
+NOREBOOT=1 /usr/bin/ameer-mode
+exit 0

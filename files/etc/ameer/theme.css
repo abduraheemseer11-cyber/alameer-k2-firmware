@@ -1,0 +1,45 @@
+
+/* AL-AMEER-THEME */
+:root{
+  --a-bg:#ffffff;--a-text:#000000;--a-card:#ffffff;--a-border:#cfcfcf;
+  --a-bar:#8b0000;--a-sel:#8b0000;--a-input:#ffffff;
+  --a-apply:#4a148c;--a-save:#ef6c00;--a-reset:#8b0000;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-darkmode="false"]){
+    --a-bg:#121212;--a-text:#ffffff;--a-card:#1e1e1e;--a-border:#3a3a3a;
+    --a-bar:#6b0d14;--a-sel:#a31d2e;--a-input:#262626;
+    --a-apply:#7e57c2;--a-save:#fb8c00;--a-reset:#c62828;
+  }
+}
+:root[data-darkmode="true"]{
+  --a-bg:#121212;--a-text:#ffffff;--a-card:#1e1e1e;--a-border:#3a3a3a;
+  --a-bar:#6b0d14;--a-sel:#a31d2e;--a-input:#262626;
+  --a-apply:#7e57c2;--a-save:#fb8c00;--a-reset:#c62828;
+}
+
+html,body,.main,.main-right,.main-left,#maincontent,#view,.container,.cbi-map,.cbi-section,fieldset,
+.cbi-section-node,.cbi-tabcontainer,.cbi-tabmenu li,.table,.tr,.td,.th,.modal,.cbi-dropdown>ul,
+.cbi-dropdown>ul>li,.label,.alert-message{background-color:var(--a-bg)!important;color:var(--a-text)!important}
+.cbi-section,.cbi-map,.modal,fieldset,.cbi-tabcontainer{background-color:var(--a-card)!important;border-color:var(--a-border)!important}
+h1,h2,h3,h4,p,label,legend,span,div,td,th,li,a,.cbi-value-title,.cbi-value-description,.cbi-section-descr{color:var(--a-text)!important}
+input,select,textarea,.cbi-input-text,.cbi-input-password,.cbi-input-select,.cbi-dropdown{
+  background-color:var(--a-input)!important;color:var(--a-text)!important;border-color:var(--a-border)!important}
+
+/* القائمة الجانبية: العنصر المختار */
+.main-left .nav li.active>a,.main-left a.menu.active,.main-left .nav a.active,#mainmenu li.active>a,
+#mainmenu a.active,.main-left li.selected>a,.nav li.slide.active>a.menu{
+  background-color:var(--a-sel)!important;color:#fff!important}
+.main-left .nav li.active>a *,.main-left a.menu.active *{color:#fff!important}
+
+/* الشريط العلوي */
+header,header.sticky,body>header,.main>header,header .fill,header .container{background-color:var(--a-bar)!important}
+header,header *,header a,header span,header div{color:#fff!important}
+header .brand::before,header a.brand::before{
+  content:"";display:inline-block;width:34px;height:34px;margin:0 10px;vertical-align:middle;
+  background:url(/luci-static/ameer/logo-64.png) center/contain no-repeat;border-radius:50%}
+
+/* الأزرار */
+.cbi-button-apply,.cbi-button-action.important,.btn.cbi-button-apply{background-color:var(--a-apply)!important;color:#fff!important;border-color:var(--a-apply)!important}
+.cbi-button-save,.cbi-button-positive{background-color:var(--a-save)!important;color:#fff!important;border-color:var(--a-save)!important}
+.cbi-button-reset,.cbi-button-negative,.cbi-button-remove{background-color:var(--a-reset)!important;color:#fff!important;border-color:var(--a-reset)!important}

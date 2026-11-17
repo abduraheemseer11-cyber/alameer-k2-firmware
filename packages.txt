@@ -1,0 +1,25 @@
+# حزم إضافية (-اسم = حذف حزمة افتراضية)
+-odhcp6c
+-odhcpd-ipv6only
+-dropbear
+-wpad-basic-mbedtls
+wpad-mesh-wolfssl
+dnsmasq
+firewall4
+nftables
+ppp
+ppp-mod-pppoe
+luci-base
+luci-mod-network
+luci-mod-status
+luci-mod-system
+luci-theme-material
+luci-i18n-base-ar
+uhttpd
+uhttpd-mod-ubus
+rpcd
+rpcd-mod-file
+rpcd-mod-iwinfo
+rpcd-mod-luci
+iwinfo
+lldpd
