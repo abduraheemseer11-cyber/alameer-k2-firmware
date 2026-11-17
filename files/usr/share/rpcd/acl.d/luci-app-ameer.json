@@ -1,0 +1,7 @@
+{
+	"luci-app-ameer": {
+		"description": "AL-AMEER quick setup",
+		"read":  { "uci": [ "ameer", "network", "wireless" ], "file": { "/etc/ameer/mode": [ "read" ], "/usr/bin/ameer-mode": [ "exec" ] } },
+		"write": { "uci": [ "ameer" ], "file": { "/usr/bin/ameer-mode": [ "exec" ] } }
+	}
+}

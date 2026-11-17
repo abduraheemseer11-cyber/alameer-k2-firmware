@@ -1,0 +1,2 @@
+#!/bin/sh
+[ "$ACTION" = ifup ] && [ "$INTERFACE" = lan ] && logger -t ameer-boot "lan up at $(cut -d' ' -f1 /proc/uptime)s uptime"

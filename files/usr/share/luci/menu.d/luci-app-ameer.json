@@ -1,0 +1,8 @@
+{
+	"admin/ameer": {
+		"title": "البرمجة السريعة",
+		"order": -100,
+		"action": { "type": "view", "path": "ameer/mode" },
+		"depends": { "acl": [ "luci-app-ameer" ] }
+	}
+}
