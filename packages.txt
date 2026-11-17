@@ -7,8 +7,6 @@ wpad-mesh-wolfssl
 dnsmasq
 firewall4
 nftables
-ppp
-ppp-mod-pppoe
 luci-base
 luci-mod-network
 luci-mod-status
