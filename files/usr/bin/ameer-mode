@@ -1,0 +1,139 @@
+#!/bin/sh
+# AL-AMEER Quick Setup: يطبّق /etc/config/ameer على network و wireless
+. /etc/ameer/defaults.conf
+D=/etc/ameer
+g() { uci -q get ameer.main.$1; }
+uci commit ameer 2>/dev/null
+
+MODE=$(g mode); [ -z "$MODE" ] && MODE=ap
+case "$MODE" in ap|apwds|client|repeater) ;; *) MODE=ap ;; esac
+IP=$(g ip); [ -z "$IP" ] && IP=$LAN_IP
+MASK=$(g netmask); [ -z "$MASK" ] && MASK=255.255.255.0
+GW=$(g gateway); DNS1=$(g dns1); DNS2=$(g dns2)
+CBAND=$(g client_band); [ -z "$CBAND" ] && CBAND=5g
+USSID=$(g up_ssid); UPASS=$(g up_pass)
+S2=$(g ssid_2g); S5=$(g ssid_5g)
+PASSEN=$(g pass_enabled); P2=$(g pass_2g); P5=$(g pass_5g)
+CH2=$(g channel_2g); CH5=$(g channel_5g); W2=$(g width_2g); W5=$(g width_5g)
+ISO=$(g isolate); VLAN=$(g vlan_enabled); VID=$(g vlan_id)
+
+logger -t ameer "apply mode=$MODE ip=$IP/$MASK gw=${GW:-none} ssid2g=${S2:-def} ssid5g=${S5:-def} vlan=${VLAN:-0}:$VID iso=${ISO:-0}"
+
+for f in network wireless; do [ -f $D/$f.base ] && cp $D/$f.base /etc/config/$f; done
+
+# ---------- network ----------
+wan="$(uci -q get network.wan.device)"; [ -z "$wan" ] && wan="$(uci -q get network.wan.ifname)"
+sec="$(uci show network | sed -n "s/^network\.\([^.]*\)\.name='br-lan'$/\1/p" | head -1)"
+
+set_bridge_ports() {
+  if [ -n "$sec" ]; then
+    uci -q delete network.$sec.ports
+    for p in "$@"; do uci add_list network.$sec.ports="$p"; done
+  else
+    uci set network.lan.ifname="$*"
+  fi
+}
+
+bridge_wan() {
+  [ -z "$wan" ] && return
+  if [ -n "$sec" ]; then uci add_list network.$sec.ports="$wan"
+  else uci set network.lan.ifname="$(uci -q get network.lan.ifname) $wan"; fi
+}
+
+vlan_apply() {
+  l=""; w=""; i=0
+  while uci -q get network.@switch_vlan[$i] >/dev/null 2>&1; do
+    v=$(uci -q get network.@switch_vlan[$i].vlan); p=$(uci -q get network.@switch_vlan[$i].ports)
+    [ "$v" = 1 ] && { l=$i; lp="$p"; }
+    [ "$v" = 2 ] && { w=$i; wp="$p"; }
+    i=$((i+1))
+  done
+  if [ -z "$l" ] || [ -z "$w" ] || [ -z "$wan" ]; then bridge_wan; return; fi
+  cpu=""; lan_only=""; up=""
+  for t in $lp; do case $t in *t) cpu="$t" ;; *) lan_only="$lan_only $t" ;; esac; done
+  for t in $wp; do case $t in *t) ;; *) up="$up ${t}t" ;; esac; done
+  uci set network.@switch_vlan[$l].ports="$(echo $lan_only $up $cpu)"
+  uci set network.@switch_vlan[$l].vid="$VID"
+  uci delete network.@switch_vlan[$w]
+  set_bridge_ports "${wan%.*}.$VID"
+}
+
+uci set network.lan.proto='static'
+uci set network.lan.ipaddr="$IP"
+uci set network.lan.netmask="$MASK"
+uci -q delete network.lan.ip6assign
+uci -q delete network.globals.ula_prefix
+uci -q delete network.lan.gateway
+uci -q delete network.lan.dns
+[ -n "$GW" ] && uci set network.lan.gateway="$GW"
+for d in $DNS1 $DNS2; do uci add_list network.lan.dns="$d"; done
+
+uci -q delete network.wan; uci -q delete network.wan6
+if [ "$VLAN" = 1 ] && [ -n "$VID" ]; then vlan_apply; else bridge_wan; fi
+uci commit network
+
+# ---------- wireless ----------
+for r in $(uci show wireless | sed -n 's/^wireless\.\(radio[0-9]*\)=wifi-device$/\1/p'); do
+  b="$(uci -q get wireless.$r.band)$(uci -q get wireless.$r.hwmode)"
+  case "$b" in
+    *2g*|*11g*) cur=2g; HT="${W2:-$HTMODE_2G}"; CH="${CH2:-$CHANNEL_2G}"; S="${S2:-$SSID_2G}"; K="$P2" ;;
+    *)          cur=5g; HT="${W5:-$HTMODE_5G}"; CH="${CH5:-$CHANNEL_5G}"; S="${S5:-$SSID_5G}"; K="$P5" ;;
+  esac
+  if [ "$PASSEN" = 1 ] && [ ${#K} -ge 8 ]; then ENC='psk2+ccmp'; else ENC='none'; K=''; fi
+
+  uci set wireless.$r.disabled='0'
+  uci set wireless.$r.country="$COUNTRY"
+  uci set wireless.$r.channel="${CH:-auto}"
+  uci set wireless.$r.htmode="$HT"
+
+  I="default_$r"
+  uci -q get wireless.$I >/dev/null || uci set wireless.$I='wifi-iface'
+  uci set wireless.$I.device="$r"
+  uci set wireless.$I.mode='ap'
+  uci set wireless.$I.network='lan'
+  uci set wireless.$I.ssid="$S"
+  uci set wireless.$I.encryption="$ENC"
+  if [ -n "$K" ]; then uci set wireless.$I.key="$K"; else uci -q delete wireless.$I.key; fi
+  if [ "$ISO" = 1 ]; then uci set wireless.$I.isolate='1'; else uci -q delete wireless.$I.isolate; fi
+
+  case "$MODE" in
+    apwds) uci set wireless.$I.wds='1' ;;
+    client|repeater)
+      if [ "$cur" = "$CBAND" ]; then
+        uci delete wireless.$I
+        uci set wireless.$r.channel='auto'
+        C="sta_$r"
+        if [ -n "$UPASS" ] && [ ${#UPASS} -ge 8 ]; then UENC='psk2+ccmp'; else UENC='none'; fi
+        uci set wireless.$C='wifi-iface'
+        uci set wireless.$C.device="$r"; uci set wireless.$C.mode='sta'
+        uci set wireless.$C.network='lan'; uci set wireless.$C.wds='1'
+        uci set wireless.$C.ssid="$USSID"; uci set wireless.$C.encryption="$UENC"
+        [ "$UENC" != none ] && uci set wireless.$C.key="$UPASS"
+      elif [ "$MODE" = client ]; then
+        uci set wireless.$r.disabled='1'
+      fi ;;
+  esac
+done
+uci commit wireless
+
+# ---------- زر Reset ----------
+AT=$(g antitheft); FB=$(g format_btn)
+{
+  echo '#!/bin/sh'
+  echo '[ "${ACTION}" = "released" ] || exit 0'
+  if [ "$AT" = 1 ]; then
+    echo 'logger "reset button ignored (anti-theft)"'
+  else
+    echo 'logger "$BUTTON pressed for $SEEN seconds"'
+    echo 'if [ "$SEEN" -lt 1 ]; then sync; reboot'
+    [ "$FB" = 1 ] && echo 'elif [ "$SEEN" -gt 5 ]; then jffs2reset -y && reboot &'
+    echo 'fi'
+  fi
+} > /etc/rc.button/reset
+chmod +x /etc/rc.button/reset
+grep -qs '/etc/rc.button/reset' /etc/sysupgrade.conf || echo '/etc/rc.button/reset' >> /etc/sysupgrade.conf
+
+echo "$MODE" > $D/mode
+sync
+[ -z "$NOREBOOT" ] && { (sleep 2; /etc/init.d/network restart) >/dev/null 2>&1 & }
+echo "OK: mode=$MODE ip=$IP/$MASK gw=${GW:-none} vlan=${VLAN:-0}:$VID"
