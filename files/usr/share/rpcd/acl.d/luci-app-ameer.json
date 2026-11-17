@@ -1,7 +1,0 @@
-{
-	"luci-app-ameer": {
-		"description": "AL-AMEER quick setup",
-		"read":  { "uci": [ "ameer" ] },
-		"write": { "uci": [ "ameer" ], "file": { "/usr/bin/ameer-mode": [ "exec" ] } }
-	}
-}

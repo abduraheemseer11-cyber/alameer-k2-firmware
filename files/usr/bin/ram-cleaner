@@ -1,8 +1,0 @@
-#!/bin/sh
-. /etc/ameer/defaults.conf
-avail=$(awk '/^MemAvailable/{print $2}' /proc/meminfo)
-[ -z "$avail" ] && avail=$(awk '/^MemFree|^Cached/{s+=$2}END{print s}' /proc/meminfo)
-if [ "$avail" -lt "${RAM_THRESHOLD_KB:-20000}" ]; then
-  sync; echo 3 > /proc/sys/vm/drop_caches
-  logger -t ram-cleaner "caches dropped (available was ${avail} kB)"
-fi
