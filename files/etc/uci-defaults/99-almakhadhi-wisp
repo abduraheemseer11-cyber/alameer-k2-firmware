@@ -1,0 +1,124 @@
+#!/bin/sh
+# ALAMEER SOFTWARE - Al-Makhadhi WISP Edition
+# Eng. Abdulrahim Al-Makhadhi - first boot configuration (idempotent)
+
+# ------------------------- editable settings -------------------------
+LAN_IP="192.168.1.20"
+NETMASK="255.255.255.0"
+GATEWAY=""                 # optional: e.g. 192.168.1.1 (MikroTik) to manage from other subnets
+HOSTNAME="Al-Makhadhi-K2"
+COUNTRY="BO"
+TXPOWER="30"
+
+SSID_2G="AbduRaheem_2G"; CH_2G="6";  HT_2G="HT20"
+SSID_5G="AbduRaheem_5G"; CH_5G="36"; HT_5G="VHT80"
+# ---------------------------------------------------------------------
+
+# ---- System / network / DHCP (run once) ----
+if [ ! -f /etc/.alameer_net_done ]; then
+
+    uci set system.@system[0].hostname="$HOSTNAME"
+    uci commit system
+
+    # Static management IP on br-lan
+    uci set network.lan.proto='static'
+    uci set network.lan.ipaddr="$LAN_IP"
+    uci set network.lan.netmask="$NETMASK"
+    uci -q delete network.lan.ip6assign
+    uci -q delete network.globals.ula_prefix
+    if [ -n "$GATEWAY" ]; then
+        uci set network.lan.gateway="$GATEWAY"
+        uci set network.lan.dns="$GATEWAY"
+    fi
+
+    # Layer-2 transparent bridge: merge the WAN port into br-lan, drop wan/wan6
+    WANDEV="$(uci -q get network.wan.device)"
+    [ -z "$WANDEV" ] && WANDEV="$(uci -q get network.wan.ifname)"
+    [ -z "$WANDEV" ] && WANDEV="eth0.2"
+    uci -q delete network.wan
+    uci -q delete network.wan6
+
+    FOUND=0; idx=0
+    while uci -q get network.@device[$idx] >/dev/null 2>&1; do
+        if [ "$(uci -q get network.@device[$idx].name)" = "br-lan" ]; then
+            uci add_list network.@device[$idx].ports="$WANDEV"
+            uci set network.@device[$idx].stp='1'    # loop protection
+            FOUND=1
+        fi
+        idx=$((idx+1))
+    done
+    if [ "$FOUND" = "0" ]; then
+        OLD="$(uci -q get network.lan.ifname)"
+        uci set network.lan.type='bridge'
+        uci set network.lan.ifname="$OLD $WANDEV"
+        uci set network.lan.stp='1'
+    fi
+    uci commit network
+
+    # No DHCP server: clients get addresses from MikroTik
+    uci set dhcp.lan.ignore='1'
+    uci -q delete dhcp.lan.dhcpv6
+    uci -q delete dhcp.lan.ra
+    uci commit dhcp
+    [ -x /etc/init.d/odhcpd ] && /etc/init.d/odhcpd disable 2>/dev/null
+
+    # No NAT / no firewall (package is not even installed, this is a safeguard)
+    [ -x /etc/init.d/firewall ] && /etc/init.d/firewall disable 2>/dev/null
+
+    # LLDP / CDP / EDP / SONMP so the router shows up in Winbox -> Neighbors
+    /etc/init.d/lldpd enable 2>/dev/null
+    uci -q get lldpd.config >/dev/null 2>&1 || uci set lldpd.config='lldpd'
+    uci set lldpd.config.enable_cdp='1'
+    uci set lldpd.config.enable_fdp='1'
+    uci set lldpd.config.enable_sonmp='1'
+    uci set lldpd.config.enable_edp='1'
+    uci set lldpd.config.lldp_class='4'
+    uci set lldpd.config.lldp_description="ALAMEER SOFTWARE - Eng. Abdulrahim Al-Makhadhi"
+    uci commit lldpd
+
+    # LuCI theme
+    uci set luci.main.mediaurlbase='/luci-static/bootstrap'
+    uci commit luci
+
+    # Watchdog cron (every 5 minutes)
+    chmod +x /usr/bin/alameer-watchdog.sh 2>/dev/null
+    touch /etc/crontabs/root
+    grep -q alameer-watchdog /etc/crontabs/root || \
+        echo '*/5 * * * * /usr/bin/alameer-watchdog.sh' >> /etc/crontabs/root
+    /etc/init.d/cron enable 2>/dev/null
+
+    touch /etc/.alameer_net_done
+fi
+
+# ---- Wireless ----
+[ -f /etc/config/wireless ] || wifi config >/dev/null 2>&1
+uci -q get wireless.radio0 >/dev/null 2>&1 || wifi config >/dev/null 2>&1
+
+if ! uci -q get wireless.radio0 >/dev/null 2>&1; then
+    # radios not detected yet: keep this script so it runs again on next boot
+    logger -t alameer "radio0 not detected yet, will retry on next boot"
+    exit 1
+fi
+
+setup_radio() {
+    R="$1"; SSID="$2"; CH="$3"; HT="$4"
+    uci -q get wireless.$R >/dev/null 2>&1 || return 0
+    uci set wireless.$R.disabled='0'
+    uci set wireless.$R.country="$COUNTRY"
+    uci set wireless.$R.txpower="$TXPOWER"
+    uci set wireless.$R.channel="$CH"
+    uci set wireless.$R.htmode="$HT"
+    uci -q delete wireless.default_$R
+    uci set wireless.default_$R='wifi-iface'
+    uci set wireless.default_$R.device="$R"
+    uci set wireless.default_$R.network='lan'
+    uci set wireless.default_$R.mode='ap'
+    uci set wireless.default_$R.ssid="$SSID"
+    uci set wireless.default_$R.encryption='none'
+}
+
+setup_radio radio0 "$SSID_2G" "$CH_2G" "$HT_2G"
+setup_radio radio1 "$SSID_5G" "$CH_5G" "$HT_5G"
+uci commit wireless
+
+exit 0

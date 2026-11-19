@@ -1,0 +1,118 @@
+name: Build ALAMEER OpenWrt 21.02.7 (Phicomm K2)
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: "Hardware revision (rev.B = MT7612E 5GHz, rev.A = MT7610E 5GHz)"
+        required: true
+        default: phicomm_psg1218b
+        type: choice
+        options:
+          - phicomm_psg1218b
+          - phicomm_psg1218a
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+
+permissions:
+  contents: write
+
+env:
+  OPENWRT_TAG: v21.02.7
+  MAX_BYTES: 7759462          # 7.4 MiB
+  DEVICE: ${{ github.event.inputs.device || 'phicomm_psg1218b' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force || true
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libncurses5-dev libssl-dev python3 python3-distutils python3-setuptools \
+            rsync unzip zlib1g-dev file wget ccache libelf-dev
+
+      - name: Clone OpenWrt ${{ env.OPENWRT_TAG }}
+        run: git clone --depth 1 --branch "$OPENWRT_TAG" https://github.com/openwrt/openwrt.git openwrt
+
+      - name: Update & install feeds
+        working-directory: openwrt
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Patch LuCI bootstrap theme (header/footer/logo)
+        working-directory: openwrt
+        run: |
+          python3 ../scripts/patch-theme.py feeds/luci/themes/luci-theme-bootstrap/luasrc/view/themes/bootstrap
+
+      - name: Apply diffconfig and overlay files
+        working-directory: openwrt
+        run: |
+          cp ../configs/phicomm_k2.diffconfig .config
+          sed -i "s/phicomm_psg1218b/${DEVICE}/" .config
+          mkdir -p files
+          cp -a ../files/. files/
+          chmod +x files/etc/uci-defaults/99-almakhadhi-wisp files/usr/bin/alameer-watchdog.sh
+          make defconfig
+          echo "---- sanity check of selected options ----"
+          for o in "CONFIG_TARGET_ramips_mt7620_DEVICE_${DEVICE}=y" \
+                   CONFIG_PACKAGE_lldpd=y CONFIG_PACKAGE_wpad-mesh-wolfssl=y \
+                   CONFIG_PACKAGE_relayd=y CONFIG_PACKAGE_luci-proto-relay=y \
+                   CONFIG_PACKAGE_luci-theme-bootstrap=y; do
+            grep -q "^${o}$" .config && echo "OK   $o" || { echo "MISSING $o"; exit 1; }
+          done
+
+      - name: Download sources
+        working-directory: openwrt
+        run: make download -j8
+
+      - name: Build firmware
+        working-directory: openwrt
+        run: |
+          make -j"$(nproc)" || make -j1 V=s
+
+      - name: Verify image size (< 7.4 MiB)
+        working-directory: openwrt
+        run: |
+          IMG=$(find bin/targets/ramips/mt7620 -name '*sysupgrade.bin' | head -n1)
+          [ -n "$IMG" ] || { echo "sysupgrade image not found"; exit 1; }
+          SIZE=$(stat -c%s "$IMG")
+          echo "Image: $IMG"
+          echo "Size : $SIZE bytes (limit $MAX_BYTES)"
+          if [ "$SIZE" -ge "$MAX_BYTES" ]; then
+            echo "::error::Image is too big ($SIZE >= $MAX_BYTES)"; exit 1
+          fi
+          mkdir -p ../out
+          cp "$IMG" "../out/ALAMEER-K2-${DEVICE}-openwrt-21.02.7-sysupgrade.bin"
+          cd ../out && sha256sum *.bin > sha256sums.txt && cat sha256sums.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALAMEER-K2-firmware
+          path: out/*
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: alameer-k2-${{ github.run_number }}
+          name: "ALAMEER K2 WISP Edition #${{ github.run_number }} (${{ env.DEVICE }})"
+          body: |
+            OpenWrt 21.02.7 - Phicomm K2 (${{ env.DEVICE }}) - ALAMEER SOFTWARE / Eng. Abdulrahim Al-Makhadhi
+            Default LAN IP: 192.168.1.20 - Wi-Fi: AbduRaheem_2G / AbduRaheem_5G (open)
+          files: out/*
