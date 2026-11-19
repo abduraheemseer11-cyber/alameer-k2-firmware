@@ -1,10 +1,11 @@
 # ALAMEER SOFTWARE - Al-Makhadhi WISP Edition
 # OpenWrt 21.02.7 - ramips/mt7620 - Phicomm PSG1218 (K2)
-# rev.B (MT7612E 5GHz) = phicomm_psg1218b   |   rev.A (MT7610E 5GHz) = phicomm_psg1218a
-# The workflow replaces the device name below according to the chosen input.
+# Phicomm K2 (PSG1218):  phicomm_k2-v22.5  (stock firmware v22.5.x.x or newer)
+#                        phicomm_k2-v22.4  (stock firmware v22.4.x.x or older)
+# The workflow replaces __DEVICE__ below with the chosen input.
 CONFIG_TARGET_ramips=y
 CONFIG_TARGET_ramips_mt7620=y
-CONFIG_TARGET_ramips_mt7620_DEVICE_phicomm_psg1218b=y
+CONFIG_TARGET_ramips_mt7620_DEVICE___DEVICE__=y
 
 # ---- Size reduction: no IPv6 / PPPoE / USB / firewall(NAT) ----
 # CONFIG_IPV6 is not set

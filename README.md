@@ -1,5 +1,5 @@
 # ALAMEER SOFTWARE — Al-Makhadhi WISP Edition
-**OpenWrt 21.02.7 for Phicomm K2 (PSG1218 / MT7620A)** — MikroTik Hotspot / WISP ready
+**OpenWrt for Phicomm K2 (mt7620 / `phicomm_k2-v22.5`)** — MikroTik Hotspot / WISP ready
 Developer: **Eng. Abdulrahim Al-Makhadhi** | المهندس عبد الرحيم الماخذي
 
 ```
@@ -17,10 +17,11 @@ Developer: **Eng. Abdulrahim Al-Makhadhi** | المهندس عبد الرحيم 
 ```
 
 ## ⚠️ Important notes / ملاحظات مهمة
-1. **Device name / اسم الجهاز:** OpenWrt has no profile called `phicomm_k2`. The K2 (PSG1218) profiles are
-   `phicomm_psg1218a` (5GHz = MT7610E) and `phicomm_psg1218b` (5GHz = MT7612E). Default here is **rev.B**
-   (MT7612E, as in your spec). Choose the right one when you run the workflow (check the label under the router).
-   لا يوجد ملف تعريف باسم `phicomm_k2`؛ الاسمان الصحيحان هما `psg1218a` و `psg1218b`. الافتراضي هنا **B** (MT7612E).
+1. **Device / الجهاز:** target is `ramips/mt7620` profile **`phicomm_k2-v22.5`** (K2 whose stock firmware is 22.5.x.x or newer, MT7612E 5GHz).
+   If your router still runs stock **22.4 or older**, run the workflow with `phicomm_k2-v22.4`. Flashing the wrong variant can brick the router
+   because the flash layout differs (v22.5 has an extra `permanent_config` partition).
+   الملف مبني لـ `phicomm_k2-v22.5`. إذا كان فيرموير الجهاز الأصلي 22.4 أو أقدم اختر `phicomm_k2-v22.4`.
+   If OpenWrt **v21.02.7** has no such profile, the workflow stops with a clear message → re-run with `openwrt_tag = v22.03.7`.
 2. **Theme patching:** `header.htm` / `footer.htm` are patched at build time from the genuine LuCI 21.02.7 files
    (`scripts/patch-theme.py`) instead of being hand-copied, so LuCI can't break. The build fails early if the patch doesn't match.
 3. **TX power 30 / القدرة 30:** the driver/EEPROM/regdb still cap the real output (and 30 dBm exceeds legal limits in many countries). Use responsibly.
@@ -51,7 +52,7 @@ git push -u origin main
 3. من Settings ← Actions ← General ← Workflow permissions اختر **Read and write permissions**.
 
 ### 3) تشغيل البناء وتنزيل الملف
-1. تبويب **Actions** ← **Build ALAMEER OpenWrt 21.02.7** ← **Run workflow** ← اختر `phicomm_psg1218b` (أو `a`).
+1. تبويب **Actions** ← **Build ALAMEER OpenWrt 21.02.7** ← **Run workflow** ← اختر `phicomm_k2-v22.5` (أو `phicomm_k2-v22.4` لنسخة 22.4 وأقدم) ثم الإصدار `v21.02.7`.
 2. الدفع (push) إلى `main` يبدأ البناء تلقائياً أيضاً. يستغرق البناء 40–90 دقيقة تقريباً.
 3. بعد النجاح: حمّل الملف `ALAMEER-K2-...-sysupgrade.bin` من **Releases** أو من **Artifacts**.
 
@@ -84,7 +85,7 @@ Then **Settings → Actions → General → Workflow permissions → Read and wr
 (If uploading via the web UI, make sure the hidden `.github` folder is included.)
 
 ### 3) Run the build
-**Actions → Build ALAMEER OpenWrt 21.02.7 → Run workflow** (pick rev.B or rev.A). Takes ~40–90 min.
+**Actions → Build ALAMEER OpenWrt 21.02.7 → Run workflow** (pick `phicomm_k2-v22.5` or `phicomm_k2-v22.4`, tag `v21.02.7`). Takes ~40–90 min.
 Download `ALAMEER-K2-...-sysupgrade.bin` from **Releases** or the run's **Artifacts**. The job fails if the image is ≥ 7.4 MiB.
 
 ### 4) Flash safely with Breed (keep EEPROM/ART)

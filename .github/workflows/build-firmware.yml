@@ -1,16 +1,24 @@
-name: Build ALAMEER OpenWrt 21.02.7 (Phicomm K2)
+name: Build ALAMEER OpenWrt (Phicomm K2 mt7620)
 
 on:
   workflow_dispatch:
     inputs:
       device:
-        description: "Hardware revision (rev.B = MT7612E 5GHz, rev.A = MT7610E 5GHz)"
+        description: "K2 variant (v22.5 = stock firmware 22.5.x.x or newer, v22.4 = 22.4.x.x or older)"
         required: true
-        default: phicomm_psg1218b
+        default: phicomm_k2-v22.5
         type: choice
         options:
-          - phicomm_psg1218b
-          - phicomm_psg1218a
+          - phicomm_k2-v22.5
+          - phicomm_k2-v22.4
+      openwrt_tag:
+        description: "OpenWrt tag (use v22.03.7 if v21.02.7 has no phicomm_k2-v22.x profile)"
+        required: true
+        default: v21.02.7
+        type: choice
+        options:
+          - v21.02.7
+          - v22.03.7
   push:
     branches: [ main, master ]
     paths-ignore:
@@ -21,9 +29,9 @@ permissions:
   contents: write
 
 env:
-  OPENWRT_TAG: v21.02.7
+  OPENWRT_TAG: ${{ github.event.inputs.openwrt_tag || 'v21.02.7' }}
   MAX_BYTES: 7759462          # 7.4 MiB
-  DEVICE: ${{ github.event.inputs.device || 'phicomm_psg1218b' }}
+  DEVICE: ${{ github.event.inputs.device || 'phicomm_k2-v22.5' }}
 
 jobs:
   build:
@@ -49,6 +57,16 @@ jobs:
       - name: Clone OpenWrt ${{ env.OPENWRT_TAG }}
         run: git clone --depth 1 --branch "$OPENWRT_TAG" https://github.com/openwrt/openwrt.git openwrt
 
+      - name: Check that the K2 profile exists in this OpenWrt tag
+        working-directory: openwrt
+        run: |
+          if ! grep -q "^define Device/${DEVICE}\$" target/linux/ramips/image/mt7620.mk; then
+            echo "::error::Profile ${DEVICE} does not exist in OpenWrt ${OPENWRT_TAG}. Available Phicomm profiles:"
+            grep -o "^define Device/phicomm[^ ]*" target/linux/ramips/image/mt7620.mk || true
+            echo "::error::Re-run the workflow with openwrt_tag=v22.03.7 (or pick one of the profiles listed above)."
+            exit 1
+          fi
+
       - name: Update & install feeds
         working-directory: openwrt
         run: |
@@ -64,7 +82,7 @@ jobs:
         working-directory: openwrt
         run: |
           cp ../configs/phicomm_k2.diffconfig .config
-          sed -i "s/phicomm_psg1218b/${DEVICE}/" .config
+          sed -i "s/__DEVICE__/${DEVICE}/" .config
           mkdir -p files
           cp -a ../files/. files/
           chmod +x files/etc/uci-defaults/99-almakhadhi-wisp files/usr/bin/alameer-watchdog.sh
@@ -98,7 +116,7 @@ jobs:
             echo "::error::Image is too big ($SIZE >= $MAX_BYTES)"; exit 1
           fi
           mkdir -p ../out
-          cp "$IMG" "../out/ALAMEER-K2-${DEVICE}-openwrt-21.02.7-sysupgrade.bin"
+          cp "$IMG" "../out/ALAMEER-K2-${DEVICE}-openwrt-${OPENWRT_TAG}-sysupgrade.bin"
           cd ../out && sha256sum *.bin > sha256sums.txt && cat sha256sums.txt
 
       - name: Upload artifact
@@ -113,6 +131,6 @@ jobs:
           tag_name: alameer-k2-${{ github.run_number }}
           name: "ALAMEER K2 WISP Edition #${{ github.run_number }} (${{ env.DEVICE }})"
           body: |
-            OpenWrt 21.02.7 - Phicomm K2 (${{ env.DEVICE }}) - ALAMEER SOFTWARE / Eng. Abdulrahim Al-Makhadhi
+            OpenWrt ${{ env.OPENWRT_TAG }} - Phicomm K2 (${{ env.DEVICE }}) - ALAMEER SOFTWARE / Eng. Abdulrahim Al-Makhadhi
             Default LAN IP: 192.168.1.20 - Wi-Fi: AbduRaheem_2G / AbduRaheem_5G (open)
           files: out/*
