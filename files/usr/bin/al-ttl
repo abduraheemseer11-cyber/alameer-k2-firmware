@@ -1,0 +1,26 @@
+#!/bin/sh
+# al-ttl on [قيمة=65] | off   — تعديل TTL للحزم الخارجة (nftables / firewall4)
+F=/usr/share/al-makhadhi/ttl.nft
+case "$1" in
+  on)
+    V="${2:-65}"
+    cat > $F <<EOT
+chain al_makhadhi_ttl {
+	type filter hook postrouting priority mangle; policy accept;
+	ip ttl set $V
+}
+EOT
+    uci -q delete firewall.al_ttl
+    uci set firewall.al_ttl=include
+    uci set firewall.al_ttl.type='nftables'
+    uci set firewall.al_ttl.path="$F"
+    uci set firewall.al_ttl.position='table-post'
+    uci commit firewall
+    /etc/init.d/firewall reload 2>/dev/null
+    echo "TTL = $V enabled" ;;
+  off)
+    uci -q delete firewall.al_ttl; uci commit firewall
+    rm -f $F; /etc/init.d/firewall reload 2>/dev/null
+    echo "TTL modification disabled" ;;
+  *) echo "usage: al-ttl on [value] | off"; exit 1 ;;
+esac

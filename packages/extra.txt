@@ -1,0 +1,6 @@
+# حزم إضافية: تُحذف تلقائياً (variant lite) إذا تجاوزت الصورة 7.5MB
+sqm-scripts
+luci-app-sqm
+luci-app-wol
+luci-proto-relay
+rp-pppoe-server

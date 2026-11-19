@@ -1,4 +1,4 @@
-name: Build AL-AMEER Phicomm K2 Firmware
+name: Build Al-Makhadhi K2 Firmware
 
 on:
   workflow_dispatch:
@@ -7,10 +7,15 @@ on:
         description: 'OpenWrt version'
         default: '23.05.3'
       profile:
-        description: 'Device profile (PSG1218 revision)'
+        description: 'Device profile'
         type: choice
         default: phicomm_k2-v22.5
-        options: [phicomm_k2-v22.5, phicomm_psg1218b]
+        options: [phicomm_k2-v22.5, phicomm_psg1218a, phicomm_psg1218b]
+      variant:
+        description: 'full (sqm/wol/...) or lite'
+        type: choice
+        default: full
+        options: [full, lite]
   push:
     branches: [main]
     tags: ['v*']
@@ -23,74 +28,21 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       VERSION: ${{ github.event.inputs.openwrt_version || '23.05.3' }}
-      # سيتم تحديث PROFILE تلقائياً في خطوة التحقق إذا لزم الأمر
       PROFILE: ${{ github.event.inputs.profile || 'phicomm_k2-v22.5' }}
+      VARIANT: ${{ github.event.inputs.variant || 'full' }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses-dev zlib1g-dev gawk git gettext \
             libssl-dev xsltproc rsync wget unzip python3 zstd xz-utils file jq
-
-      - name: Download ImageBuilder
-        run: |
-          BASE=https://downloads.openwrt.org/releases/$VERSION/targets/ramips/mt7620
-          FILE=$(wget -qO- $BASE/ | grep -oE 'openwrt-imagebuilder-[^"<> ]+Linux-x86_64\.tar\.(xz|zst)' | head -1)
-          echo "ImageBuilder: $FILE"
-          wget -q "$BASE/$FILE"
-          mkdir ib && tar -xf "$FILE" -C ib --strip-components=1
-
-      - name: Validate and auto-detect profile
-        run: |
-          # تنزيل profiles.json لفحص البروفايلات المتاحة
-          wget -q "https://downloads.openwrt.org/releases/${VERSION}/targets/ramips/mt7620/profiles.json" -O profiles.json
-          
-          # التحقق من وجود البروفايل المطلوب
-          if jq -e --arg p "$PROFILE" '.profiles | has($p)' profiles.json > /dev/null 2>&1; then
-            echo "✅ البروفايل '$PROFILE' موجود."
-          else
-            echo "⚠️ البروفايل '$PROFILE' غير موجود. جاري البحث عن بديل..."
-            # البحث عن أي بروفايل يحتوي على phicomm أو psg1218 أو k2
-            ALT_PROFILE=$(jq -r '.profiles | keys[] | select(test("phicomm|psg1218|k2"; "i"))' profiles.json | head -1)
-            if [ -n "$ALT_PROFILE" ]; then
-              echo "🔄 تم العثور على بروفايل بديل: $ALT_PROFILE. سيتم استخدامه."
-              echo "PROFILE=$ALT_PROFILE" >> $GITHUB_ENV
-            else
-              echo "❌ لم يتم العثور على أي بروفايل لجهاز Phicomm K2 في هذا الإصدار."
-              echo "📋 قائمة البروفايلات المتاحة (أول 20):"
-              jq -r '.profiles | keys[]' profiles.json | head -20
-              exit 1
-            fi
-          fi
-
-      - name: Build firmware
-        run: |
-          chmod +x files/usr/bin/* files/etc/uci-defaults/* 2>/dev/null || true
-          PKGS=$(grep -v '^#' packages.txt | tr '\n' ' ')
-          cd ib
-          make image PROFILE="$PROFILE" PACKAGES="$PKGS" FILES="$GITHUB_WORKSPACE/files" EXTRA_IMAGE_NAME="ameer"
-          ls -l bin/targets/ramips/mt7620/
-
-      - name: Check size (<= 7.5MB)
-        run: |
-          for f in ib/bin/targets/ramips/mt7620/*sysupgrade.bin; do
-            s=$(stat -c%s "$f"); echo "$f = $s bytes"
-            [ "$s" -le 7864320 ] || { echo "❌ الصورة كبيرة جداً"; exit 1; }
-          done
-
-      - name: Collect
-        run: |
-          mkdir out
-          cp ib/bin/targets/ramips/mt7620/*sysupgrade.bin out/
-          cp ib/bin/targets/ramips/mt7620/sha256sums out/ || true
-
+      - name: Build
+        run: bash scripts/ib-build.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: AL-AMEER-K2-${{ env.PROFILE }}-${{ env.VERSION }}
+          name: Al-Makhadhi-K2-${{ env.PROFILE }}-${{ env.VERSION }}
           path: out/*
-
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

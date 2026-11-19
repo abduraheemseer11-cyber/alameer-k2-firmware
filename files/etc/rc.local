@@ -1,2 +1,0 @@
-logger -t ameer-boot "boot finished at $(cut -d' ' -f1 /proc/uptime)s uptime"
-exit 0
