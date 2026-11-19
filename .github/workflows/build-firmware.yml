@@ -12,13 +12,13 @@ on:
           - phicomm_k2-v22.5
           - phicomm_k2-v22.4
       openwrt_tag:
-        description: "OpenWrt tag (use v22.03.7 if v21.02.7 has no phicomm_k2-v22.x profile)"
+        description: "OpenWrt tag (phicomm_k2-v22.x requires v22.03.7+)"
         required: true
-        default: v21.02.7
+        default: v22.03.7
         type: choice
         options:
-          - v21.02.7
           - v22.03.7
+          - v21.02.7
   push:
     branches: [ main, master ]
     paths-ignore:
@@ -29,8 +29,8 @@ permissions:
   contents: write
 
 env:
-  OPENWRT_TAG: ${{ github.event.inputs.openwrt_tag || 'v21.02.7' }}
-  MAX_BYTES: 7759462          # 7.4 MiB
+  OPENWRT_TAG: ${{ github.event.inputs.openwrt_tag || 'v22.03.7' }}
+  MAX_BYTES: 7759462          # 7.4 MiB (K2 has only 8 MiB flash)
   DEVICE: ${{ github.event.inputs.device || 'phicomm_k2-v22.5' }}
 
 jobs:
@@ -57,13 +57,14 @@ jobs:
       - name: Clone OpenWrt ${{ env.OPENWRT_TAG }}
         run: git clone --depth 1 --branch "$OPENWRT_TAG" https://github.com/openwrt/openwrt.git openwrt
 
-      - name: Check that the K2 profile exists in this OpenWrt tag
+      - name: Verify the K2 profile exists in this OpenWrt tag
         working-directory: openwrt
         run: |
-          if ! grep -q "^define Device/${DEVICE}\$" target/linux/ramips/image/mt7620.mk; then
-            echo "::error::Profile ${DEVICE} does not exist in OpenWrt ${OPENWRT_TAG}. Available Phicomm profiles:"
-            grep -o "^define Device/phicomm[^ ]*" target/linux/ramips/image/mt7620.mk || true
-            echo "::error::Re-run the workflow with openwrt_tag=v22.03.7 (or pick one of the profiles listed above)."
+          MK=target/linux/ramips/image/mt7620.mk
+          echo "---- Phicomm profiles in ${OPENWRT_TAG} ----"
+          grep -E "^define Device/(phicomm|psg)" "$MK" || true
+          if ! grep -q "^define Device/${DEVICE}\$" "$MK"; then
+            echo "::error::Profile ${DEVICE} missing in ${OPENWRT_TAG}. Use openwrt_tag=v22.03.7 for phicomm_k2-v22.x"
             exit 1
           fi
 
@@ -73,10 +74,10 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Patch LuCI bootstrap theme (header/footer/logo)
+      - name: Patch LuCI bootstrap theme (21.02 & 22.03 compatible)
         working-directory: openwrt
         run: |
-          python3 ../scripts/patch-theme.py feeds/luci/themes/luci-theme-bootstrap/luasrc/view/themes/bootstrap
+          python3 ../scripts/patch-theme.py feeds/luci/themes/luci-theme-bootstrap
 
       - name: Apply diffconfig and overlay files
         working-directory: openwrt
@@ -87,7 +88,7 @@ jobs:
           cp -a ../files/. files/
           chmod +x files/etc/uci-defaults/99-almakhadhi-wisp files/usr/bin/alameer-watchdog.sh
           make defconfig
-          echo "---- sanity check of selected options ----"
+          echo "---- sanity check ----"
           for o in "CONFIG_TARGET_ramips_mt7620_DEVICE_${DEVICE}=y" \
                    CONFIG_PACKAGE_lldpd=y CONFIG_PACKAGE_wpad-mesh-wolfssl=y \
                    CONFIG_PACKAGE_relayd=y CONFIG_PACKAGE_luci-proto-relay=y \
@@ -113,7 +114,7 @@ jobs:
           echo "Image: $IMG"
           echo "Size : $SIZE bytes (limit $MAX_BYTES)"
           if [ "$SIZE" -ge "$MAX_BYTES" ]; then
-            echo "::error::Image is too big ($SIZE >= $MAX_BYTES)"; exit 1
+            echo "::error::Image too big ($SIZE >= $MAX_BYTES)"; exit 1
           fi
           mkdir -p ../out
           cp "$IMG" "../out/ALAMEER-K2-${DEVICE}-openwrt-${OPENWRT_TAG}-sysupgrade.bin"
@@ -129,7 +130,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: alameer-k2-${{ github.run_number }}
-          name: "ALAMEER K2 WISP Edition #${{ github.run_number }} (${{ env.DEVICE }})"
+          name: "ALAMEER K2 WISP Edition #${{ github.run_number }} (${{ env.DEVICE }} / ${{ env.OPENWRT_TAG }})"
           body: |
             OpenWrt ${{ env.OPENWRT_TAG }} - Phicomm K2 (${{ env.DEVICE }}) - ALAMEER SOFTWARE / Eng. Abdulrahim Al-Makhadhi
             Default LAN IP: 192.168.1.20 - Wi-Fi: AbduRaheem_2G / AbduRaheem_5G (open)
