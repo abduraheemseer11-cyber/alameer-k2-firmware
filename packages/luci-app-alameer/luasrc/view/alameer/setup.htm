@@ -1,11 +1,11 @@
 <%+header%>
 <style>
 .qs-card{background:#fff;border:1px solid #c9ccd1;border-radius:6px;padding:14px;margin:10px 0}
-.qs-card h3{margin:0 0 8px;color:#7A0D0D;border-bottom:2px solid #8B0000;padding-bottom:4px}
+.qs-card h3{margin:0 0 8px;color:#4A0E78;border-bottom:2px solid #6A1B9A;padding-bottom:4px}
 .qs-row{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0;align-items:center}
 .qs-row label{min-width:150px;font-weight:bold}.qs-row input,.qs-row select{flex:1;min-width:160px;max-width:360px}
 .qs-modes label{display:block;border:2px solid #c9ccd1;border-radius:6px;padding:8px 12px;margin:6px 0;cursor:pointer;min-width:0;font-weight:normal}
-.qs-modes input:checked+span{color:#7A0D0D;font-weight:bold}
+.qs-modes input:checked+span{color:#4A0E78;font-weight:bold}
 #qs-msg{padding:10px;border-radius:4px;margin:10px 0;display:none;white-space:pre-wrap}
 .qs-ok{background:#e7f5ea;border:1px solid #1b7a2e}.qs-err{background:#fdeaea;border:1px solid #b00020}
 .qs-note{font-size:.88em;color:#555}
@@ -26,8 +26,8 @@
  <div class="qs-row"><label>DNS (optional)</label><input id="dns" placeholder="space separated"></div>
 </div>
 <div class="qs-card"><h3>3. Wi-Fi access points</h3>
- <div class="qs-row"><label>2.4 GHz SSID</label><input id="ssid_2g"><select id="enc_2g"></select><input id="key_2g" type="password" placeholder="password (if secured)"></div>
- <div class="qs-row"><label>5 GHz SSID</label><input id="ssid_5g"><select id="enc_5g"></select><input id="key_5g" type="password" placeholder="password (if secured)"></div>
+ <div class="qs-row"><label>2.4 GHz SSID</label><input id="ssid_2g" value="AbduRaheem_2G"><select id="enc_2g"></select><input id="key_2g" type="password" placeholder="password (if secured)"></div>
+ <div class="qs-row"><label>5 GHz SSID</label><input id="ssid_5g" value="AbduRaheem_5G"><select id="enc_5g"></select><input id="key_5g" type="password" placeholder="password (if secured)"></div>
  <p class="qs-note">Open networks are the project default. Choose WPA2 / WPA2+WPA3 to secure them. Country code and TX power follow the device and regulatory limits; they are not overridden.</p>
 </div>
 <div class="qs-card" id="p-up" style="display:none"><h3>4. Upstream Wi-Fi</h3>
