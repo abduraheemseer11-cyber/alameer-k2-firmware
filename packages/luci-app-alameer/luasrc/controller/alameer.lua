@@ -162,8 +162,8 @@ function action_state()
 	json({ mode = c:get("alameer", "core", "mode"), hostname = c:get("alameer", "core", "hostname"),
 		lan_ip = c:get("alameer", "core", "lan_ip"), netmask = c:get("alameer", "core", "netmask"),
 		gateway = c:get("alameer", "core", "gateway") or "", dns = c:get("alameer", "core", "dns") or "",
-		ssid_2g = c:get("alameer", "wifi_2g", "ssid"), enc_2g = c:get("alameer", "wifi_2g", "encryption"),
-		ssid_5g = c:get("alameer", "wifi_5g", "ssid"), enc_5g = c:get("alameer", "wifi_5g", "encryption"),
+		ssid_2g = c:get("alameer", "wifi_2g", "ssid") or "AbduRaheem_2G", enc_2g = c:get("alameer", "wifi_2g", "encryption") or "none",
+		ssid_5g = c:get("alameer", "wifi_5g", "ssid") or "AbduRaheem_5G", enc_5g = c:get("alameer", "wifi_5g", "encryption") or "none",
 		pppoe = fs.access("/lib/netifd/proto/ppp.sh") and true or false })
 end
 
