@@ -2,15 +2,25 @@
 @import url("/luci-static/bootstrap/cascade.css");
 
 :root{
- --al-crimson:#7A0D0D;--al-red:#8B0000;--al-dark:#3d0606;--al-bg:#F4F5F7;--al-card:#FFFFFF;--al-text:#252525;
- --al-border:#C9CCD1;--al-silver:#E4E6EA;--al-side-w:260px;--al-radius:10px;
+ --al-crimson:#4A0E78; /* بنفسجي غامق */
+ --al-red:#6A1B9A;     /* بنفسجي متوسط */
+ --al-dark:#2A004F;    /* بنفسجي داكن جداً */
+ --al-bg:#F4F5F7;
+ --al-card:#FFFFFF;
+ --al-text:#252525;
+ --al-border:#C9CCD1;
+ --al-silver:#E4E6EA;
+ --al-side-w:260px;
+ --al-radius:10px;
  --al-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Noto Sans Arabic",sans-serif;
 }
 html,body{background:var(--al-bg)!important;color:var(--al-text)!important;font-family:var(--al-font)!important;font-size:14px}
 
-/* ---------- sidebar (built by alameer.js; stock menu is hidden only once it exists) ---------- */
-body.al-ready{padding-left:var(--al-side-w)}
-body.al-ready #mainmenu,body.al-ready .main-left,body.al-ready .showSide,body.al-ready #menubar{display:none!important}
+/* إخفاء القوائم العلوية الافتراضية لـ OpenWrt نهائياً */
+#topmenu, #modemenu, #mainmenu, .main-left, .main-right, .showSide, #menubar { display: none !important; }
+body { padding-left: var(--al-side-w) !important; }
+
+/* ---------- sidebar ---------- */
 .al-side{position:fixed;inset:0 auto 0 0;width:var(--al-side-w);display:flex;flex-direction:column;z-index:1000;
  background:linear-gradient(180deg,var(--al-crimson),var(--al-dark));color:#fff;box-shadow:2px 0 12px rgba(0,0,0,.25);overflow-y:auto}
 .al-brand{display:flex;align-items:center;gap:10px;padding:16px 14px;border-bottom:1px solid rgba(255,255,255,.18)}
@@ -38,12 +48,10 @@ body.al-ready #mainmenu,body.al-ready .main-left,body.al-ready .showSide,body.al
 .al-logout{display:flex;align-items:center;gap:8px;color:#fff!important;text-decoration:none!important;margin-bottom:8px;font-weight:600}
 .al-burger,.al-shade{display:none}
 
-/* ---------- top bar ---------- */
+/* ---------- top bar (تم تعديلها لتكون بنفسجية وتحتوي فقط على شعار أو ما تريده) ---------- */
 header{background:#fff!important;color:var(--al-text)!important;border-bottom:3px solid var(--al-red);box-shadow:0 1px 4px rgba(0,0,0,.08)}
 header .brand,header a,header .pull-right,header *{color:var(--al-crimson)!important}
 header .brand{font-weight:700}
-body:not(.al-ready) header{background:var(--al-crimson)!important}
-body:not(.al-ready) header,body:not(.al-ready) header *{color:#fff!important}
 
 /* ---------- cards / forms / tables ---------- */
 .container{max-width:1180px}
@@ -58,7 +66,7 @@ a{color:var(--al-red)}
 input,select,textarea{border:1px solid var(--al-border)!important;border-radius:6px!important;background:#fff!important;color:var(--al-text)!important}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--al-red)!important;border-color:var(--al-red)!important}
 
-/* ---------- buttons: red for save/apply ---------- */
+/* ---------- buttons ---------- */
 .cbi-button{border-radius:6px!important;border:1px solid var(--al-border)!important;background:#fff!important;color:var(--al-text)!important}
 .cbi-button:hover{border-color:var(--al-red)!important}
 .cbi-button-save,.cbi-button-apply,.cbi-button-positive,.cbi-button-action.important,.btn.cbi-button-save,.btn.cbi-button-apply,
@@ -81,17 +89,31 @@ form.login,.login-container form,#view>form{background:#fff!important;border-rad
 form.login::before{content:"";display:block;height:120px;margin-bottom:10px;background:url("/luci-static/alameer/logo-160.png") center/contain no-repeat}
 form.login::after{content:"ALAMEER SOFTWARE - Professional Networking Firmware";display:block;text-align:center;font-size:12px;color:#666;margin-top:12px}
 
-/* ---------- responsive: phone / tablet ---------- */
-@media (max-width:900px){
- body.al-ready{padding-left:0;padding-top:52px}
- .al-side{transform:translateX(-100%);transition:transform .2s ease;width:min(82vw,300px)}
- body.al-open-menu .al-side{transform:none}
- .al-burger{display:flex;align-items:center;justify-content:center;position:fixed;top:8px;left:8px;z-index:1100;width:40px;height:38px;
-  background:var(--al-red);color:#fff;border:0;border-radius:8px;font-size:20px;cursor:pointer}
- body.al-open-menu .al-shade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999}
- body.al-ready header{padding-left:56px}
- .cbi-section{padding:10px}
- table,.table{display:block;overflow-x:auto}
- form.login,.login-container form{margin:16px 10px;padding:16px}
+/* ---------- Responsive: تحسين العرض على الهواتف ---------- */
+@media screen and (max-width:900px){
+  body { padding-left: 0 !important; padding-top: 52px !important; }
+  .al-side{transform:translateX(-100%);transition:transform .2s ease;width:min(82vw,300px)}
+  body.al-open-menu .al-side{transform:none}
+  .al-burger{display:flex;align-items:center;justify-content:center;position:fixed;top:8px;left:8px;z-index:1100;width:40px;height:38px;
+   background:var(--al-red);color:#fff;border:0;border-radius:8px;font-size:20px;cursor:pointer}
+  body.al-open-menu .al-shade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999}
+  header{padding-left:56px}
+  .cbi-section{padding:10px}
+  
+  /* جعل الجداول قابلة للتمرير أفقياً */
+  table,.table{display:block;overflow-x:auto;white-space:nowrap;}
+  
+  /* ترتيب الحقول فوق بعضها في الهواتف */
+  .cbi-value { display: flex; flex-direction: column; margin-bottom: 15px; }
+  .cbi-value-title { width: 100% !important; text-align: right !important; margin-bottom: 5px; font-weight: bold; }
+  .cbi-value-field { width: 100% !important; }
+  
+  /* ترتيب الأزرار في صفحة الإعداد السريع */
+  .qs-row { flex-direction: column; align-items: flex-start; }
+  .qs-row label { margin-bottom: 5px; }
+  .qs-row input, .qs-row select { width: 100% !important; max-width: 100% !important; }
+  .cbi-page-actions { display: flex; flex-direction: column; gap: 10px; }
+  .cbi-page-actions .cbi-button { width: 100%; }
+  
+  form.login,.login-container form{margin:16px 10px;padding:16px}
 }
-@media (prefers-color-scheme:dark){html,body{color-scheme:light}}
