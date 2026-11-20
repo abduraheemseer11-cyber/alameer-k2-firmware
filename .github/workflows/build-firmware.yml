@@ -42,43 +42,99 @@ jobs:
             gettext git libncurses5-dev libssl-dev python3 python3-distutils rsync unzip zlib1g-dev \
             file wget ca-certificates swig libelf-dev xsltproc zip
 
+      # Normalize script permissions and line endings before self-tests.
+      - name: Prepare shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          scripts=(scripts/*.sh)
+
+          if (( ${#scripts[@]} == 0 )); then
+            echo "::error::No shell scripts found in scripts/"
+            exit 1
+          fi
+
+          for script in "${scripts[@]}"; do
+            if [[ ! -f "$script" ]]; then
+              echo "::error::Missing script: $script"
+              exit 1
+            fi
+
+            sed -i 's/\r$//' "$script"
+            chmod 755 "$script"
+
+            if ! head -n 1 "$script" | grep -q '^#!'; then
+              echo "::error::Missing interpreter shebang in $script"
+              exit 1
+            fi
+
+            if [[ ! -x "$script" ]]; then
+              echo "::error::Script is not executable after chmod: $script"
+              exit 1
+            fi
+          done
+
+          echo "Prepared ${#scripts[@]} shell scripts."
+          ls -l scripts/
+
       - name: Self-test verification gates
-        run: bash scripts/selftest.sh
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/selftest.sh
 
       - name: Build firmware (verifies device definition first)
         id: build
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p out
-          set -o pipefail
           bash scripts/build.sh 2>&1 | tee out/build.log
 
       - name: Verify image (size, format, device metadata)
         id: verify
+        shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           IMG="$(cat build/image.path)"
           bash scripts/verify-image-size.sh "$IMG" build/openwrt 2>&1 | tee out/verify-image.log
 
       - name: Package release artifacts (only after verification)
+        shell: bash
         run: |
+          set -euo pipefail
           export OPENWRT_TAG
           bash scripts/package-release.sh out
 
       - name: Build summary
         if: always()
+        shell: bash
         run: |
           {
             echo "## ALAMEER K2 firmware build"
             echo "- OpenWrt tag: \`$OPENWRT_TAG\`"
-            [ -f build/openwrt.sha ] && echo "- OpenWrt commit: \`$(cat build/openwrt.sha)\`"
+            if [ -f build/openwrt.sha ]; then
+              echo "- OpenWrt commit: \`$(cat build/openwrt.sha)\`"
+            fi
             if [ -f "out/$FINAL_NAME" ]; then
-              echo "- Result: **SUCCESS** – \`$FINAL_NAME\` ($(stat -c %s out/$FINAL_NAME) bytes)"
-              echo "- SHA256: \`$(cut -d' ' -f1 out/$FINAL_NAME.sha256)\`"
+              echo "- Result: **SUCCESS** – \`$FINAL_NAME\` ($(stat -c %s "out/$FINAL_NAME") bytes)"
+              if [ -f "out/$FINAL_NAME.sha256" ]; then
+                echo "- SHA256: \`$(cut -d' ' -f1 "out/$FINAL_NAME.sha256")\`"
+              fi
             else
               echo "- Result: **FAILED** – no flashable image was produced (see logs below)"
-              echo; echo '```'; tail -n 40 out/build.log 2>/dev/null; echo '```'
+              echo
+              echo '```'
+              tail -n 40 out/build.log 2>/dev/null || true
+              echo '```'
             fi
-            [ -f out/verify-image.log ] && { echo; echo '```'; cat out/verify-image.log; echo '```'; }
+            if [ -f out/verify-image.log ]; then
+              echo
+              echo '```'
+              cat out/verify-image.log
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload firmware artifacts
@@ -110,7 +166,9 @@ jobs:
         if: success() && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
+          set -euo pipefail
           gh release create "${{ github.ref_name }}" \
             "out/$FINAL_NAME" "out/$FINAL_NAME.sha256" out/VERSION.txt \
             --title "ALAMEER K2 ${{ github.ref_name }}" \
