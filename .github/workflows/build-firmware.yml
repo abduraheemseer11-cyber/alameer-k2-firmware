@@ -1,137 +1,117 @@
-name: Build ALAMEER OpenWrt (Phicomm K2 mt7620)
+name: Build ALAMEER K2 Firmware
 
 on:
   workflow_dispatch:
     inputs:
-      device:
-        description: "K2 variant (v22.5 = stock firmware 22.5.x.x or newer, v22.4 = 22.4.x.x or older)"
-        required: true
-        default: phicomm_k2-v22.5
-        type: choice
-        options:
-          - phicomm_k2-v22.5
-          - phicomm_k2-v22.4
       openwrt_tag:
-        description: "OpenWrt tag (phicomm_k2-v22.x requires v22.03.7+)"
-        required: true
-        default: v22.03.7
-        type: choice
-        options:
-          - v22.03.7
-          - v21.02.7
+        description: "Pinned OpenWrt release tag (must contain profile phicomm_k2-v22.5)"
+        required: false
+        default: "v22.03.7"
+      openwrt_commit:
+        description: "Optional expected commit SHA of the tag (build fails if different)"
+        required: false
+        default: ""
   push:
-    branches: [ main, master ]
-    paths-ignore:
-      - "README.md"
-      - "**/*.md"
+    tags: ["v*"]
 
 permissions:
   contents: write
 
 env:
   OPENWRT_TAG: ${{ github.event.inputs.openwrt_tag || 'v22.03.7' }}
-  MAX_BYTES: 7759462          # 7.4 MiB (K2 has only 8 MiB flash)
-  DEVICE: ${{ github.event.inputs.device || 'phicomm_k2-v22.5' }}
+  OPENWRT_COMMIT: ${{ github.event.inputs.openwrt_commit || '' }}
+  FINAL_NAME: ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    timeout-minutes: 300
     steps:
-      - name: Checkout repository
+      - name: Checkout project
         uses: actions/checkout@v4
 
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-          sudo docker image prune --all --force || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
-            gettext git libncurses5-dev libssl-dev python3 python3-distutils python3-setuptools \
-            rsync unzip zlib1g-dev file wget ccache libelf-dev
+            gettext git libncurses5-dev libssl-dev python3 python3-distutils rsync unzip zlib1g-dev \
+            file wget ca-certificates swig libelf-dev xsltproc zip
 
-      - name: Clone OpenWrt ${{ env.OPENWRT_TAG }}
-        run: git clone --depth 1 --branch "$OPENWRT_TAG" https://github.com/openwrt/openwrt.git openwrt
+      - name: Self-test verification gates
+        run: bash scripts/selftest.sh
 
-      - name: Verify the K2 profile exists in this OpenWrt tag
-        working-directory: openwrt
+      - name: Build firmware (verifies device definition first)
+        id: build
         run: |
-          MK=target/linux/ramips/image/mt7620.mk
-          echo "---- Phicomm profiles in ${OPENWRT_TAG} ----"
-          grep -E "^define Device/(phicomm|psg)" "$MK" || true
-          if ! grep -q "^define Device/${DEVICE}\$" "$MK"; then
-            echo "::error::Profile ${DEVICE} missing in ${OPENWRT_TAG}. Use openwrt_tag=v22.03.7 for phicomm_k2-v22.x"
-            exit 1
-          fi
+          mkdir -p out
+          set -o pipefail
+          bash scripts/build.sh 2>&1 | tee out/build.log
 
-      - name: Update & install feeds
-        working-directory: openwrt
+      - name: Verify image (size, format, device metadata)
+        id: verify
         run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          set -o pipefail
+          IMG="$(cat build/image.path)"
+          bash scripts/verify-image-size.sh "$IMG" build/openwrt 2>&1 | tee out/verify-image.log
 
-      - name: Patch LuCI bootstrap theme (21.02 & 22.03 compatible)
-        working-directory: openwrt
+      - name: Package release artifacts (only after verification)
         run: |
-          python3 ../scripts/patch-theme.py feeds/luci/themes/luci-theme-bootstrap
+          export OPENWRT_TAG
+          bash scripts/package-release.sh out
 
-      - name: Apply diffconfig and overlay files
-        working-directory: openwrt
+      - name: Build summary
+        if: always()
         run: |
-          cp ../configs/phicomm_k2.diffconfig .config
-          sed -i "s/__DEVICE__/${DEVICE}/" .config
-          mkdir -p files
-          cp -a ../files/. files/
-          chmod +x files/etc/uci-defaults/99-almakhadhi-wisp files/usr/bin/alameer-watchdog.sh
-          make defconfig
-          echo "---- sanity check ----"
-          for o in "CONFIG_TARGET_ramips_mt7620_DEVICE_${DEVICE}=y" \
-                   CONFIG_PACKAGE_lldpd=y CONFIG_PACKAGE_wpad-mesh-wolfssl=y \
-                   CONFIG_PACKAGE_relayd=y CONFIG_PACKAGE_luci-proto-relay=y \
-                   CONFIG_PACKAGE_luci-theme-bootstrap=y; do
-            grep -q "^${o}$" .config && echo "OK   $o" || { echo "MISSING $o"; exit 1; }
-          done
+          {
+            echo "## ALAMEER K2 firmware build"
+            echo "- OpenWrt tag: \`$OPENWRT_TAG\`"
+            [ -f build/openwrt.sha ] && echo "- OpenWrt commit: \`$(cat build/openwrt.sha)\`"
+            if [ -f "out/$FINAL_NAME" ]; then
+              echo "- Result: **SUCCESS** – \`$FINAL_NAME\` ($(stat -c %s out/$FINAL_NAME) bytes)"
+              echo "- SHA256: \`$(cut -d' ' -f1 out/$FINAL_NAME.sha256)\`"
+            else
+              echo "- Result: **FAILED** – no flashable image was produced (see logs below)"
+              echo; echo '```'; tail -n 40 out/build.log 2>/dev/null; echo '```'
+            fi
+            [ -f out/verify-image.log ] && { echo; echo '```'; cat out/verify-image.log; echo '```'; }
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Download sources
-        working-directory: openwrt
-        run: make download -j8
-
-      - name: Build firmware
-        working-directory: openwrt
-        run: |
-          make -j"$(nproc)" || make -j1 V=s
-
-      - name: Verify image size (< 7.4 MiB)
-        working-directory: openwrt
-        run: |
-          IMG=$(find bin/targets/ramips/mt7620 -name '*sysupgrade.bin' | head -n1)
-          [ -n "$IMG" ] || { echo "sysupgrade image not found"; exit 1; }
-          SIZE=$(stat -c%s "$IMG")
-          echo "Image: $IMG"
-          echo "Size : $SIZE bytes (limit $MAX_BYTES)"
-          if [ "$SIZE" -ge "$MAX_BYTES" ]; then
-            echo "::error::Image too big ($SIZE >= $MAX_BYTES)"; exit 1
-          fi
-          mkdir -p ../out
-          cp "$IMG" "../out/ALAMEER-K2-${DEVICE}-openwrt-${OPENWRT_TAG}-sysupgrade.bin"
-          cd ../out && sha256sum *.bin > sha256sums.txt && cat sha256sums.txt
-
-      - name: Upload artifact
+      - name: Upload firmware artifacts
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ALAMEER-K2-firmware
-          path: out/*
+          path: |
+            out/${{ env.FINAL_NAME }}
+            out/${{ env.FINAL_NAME }}.sha256
+            out/VERSION.txt
+            out/config.buildinfo
+            out/*.manifest
+          if-no-files-found: error
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: alameer-k2-${{ github.run_number }}
-          name: "ALAMEER K2 WISP Edition #${{ github.run_number }} (${{ env.DEVICE }} / ${{ env.OPENWRT_TAG }})"
-          body: |
-            OpenWrt ${{ env.OPENWRT_TAG }} - Phicomm K2 (${{ env.DEVICE }}) - ALAMEER SOFTWARE / Eng. Abdulrahim Al-Makhadhi
-            Default LAN IP: 192.168.1.20 - Wi-Fi: AbduRaheem_2G / AbduRaheem_5G (open)
-          files: out/*
+          name: build-logs
+          path: |
+            out/build.log
+            out/verify-image.log
+            build/openwrt/logs/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Create GitHub Release (tag pushes only)
+        if: success() && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "out/$FINAL_NAME" "out/$FINAL_NAME.sha256" out/VERSION.txt \
+            --title "ALAMEER K2 ${{ github.ref_name }}" \
+            --notes "Phicomm K2 v22.5 layout only. Read docs/INSTALLATION.md before flashing. SHA256 in the .sha256 file."

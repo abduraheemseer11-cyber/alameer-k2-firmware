@@ -1,0 +1,36 @@
+#!/bin/sh
+# ALAMEER SOFTWARE - first boot provisioning (runs once, then self-deletes).
+# Executes after config_generate / wifi config so board defaults exist; the
+# original board network config is saved by alameer-apply before conversion.
+. /lib/functions.sh
+
+H="$(uci -q get alameer.core.hostname)"
+uci -q batch <<UCI
+set system.@system[0].hostname='${H:-Al-Makhadhi-K2}'
+set luci.main.mediaurlbase='/luci-static/alameer'
+set luci.themes.ALAMEER='/luci-static/alameer'
+commit luci
+commit system
+UCI
+
+# Default mode: Access Point / MikroTik bridge. Does not restart the network
+# (first boot is still in progress); settings are read by netifd afterwards.
+/usr/sbin/alameer-apply ap --first-boot >/tmp/alameer-first-boot.log 2>&1
+
+# lldpd: advertise hostname, enable CDP, listen on LAN bridge only
+[ -x /usr/sbin/lldpd ] && {
+	uci -q delete lldpd.config
+	uci -q batch <<UCI
+set lldpd.config=lldpd
+set lldpd.config.enable_cdp='1'
+set lldpd.config.enable_fdp='0'
+set lldpd.config.enable_sonmp='0'
+set lldpd.config.enable_edp='0'
+set lldpd.config.lldp_class='10'
+set lldpd.config.lldp_hostname='${H:-Al-Makhadhi-K2}'
+set lldpd.config.lldp_description='ALAMEER SOFTWARE Phicomm K2 firmware'
+set lldpd.config.interface='br-lan'
+commit lldpd
+UCI
+}
+exit 0

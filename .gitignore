@@ -1,3 +1,4 @@
-openwrt/
+build/
 out/
 *.bin
+*.log

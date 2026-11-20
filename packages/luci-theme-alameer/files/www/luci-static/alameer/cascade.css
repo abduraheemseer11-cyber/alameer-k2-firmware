@@ -1,0 +1,47 @@
+/* ALAMEER SOFTWARE theme - loads Bootstrap first, then overrides. */
+@import url("/luci-static/bootstrap/cascade.css");
+
+:root{--al-crimson:#7A0D0D;--al-red:#8B0000;--al-bg:#F4F5F7;--al-card:#FFFFFF;--al-text:#252525;--al-border:#C9CCD1}
+body{background:var(--al-bg)!important;color:var(--al-text)!important}
+
+/* top bar */
+header,.main>.main-left,#header{background:var(--al-crimson)}
+header{background:var(--al-crimson)!important;color:#fff!important;border-bottom:3px solid var(--al-red)}
+header a,header .brand,header *{color:#fff}
+header .brand{display:inline-flex;align-items:center;gap:10px;font-weight:bold}
+header .brand::before{content:"";display:inline-block;width:34px;height:34px;background:url("/luci-static/alameer/logo-160.png") center/contain no-repeat;
+ background-color:#fff;border-radius:50%}
+header .brand::after{content:" | ALAMEER SOFTWARE";font-weight:normal;opacity:.9}
+
+/* side menu: active = dark red */
+.main-left{background:#fff!important;border-right:1px solid var(--al-border)}
+.main-left .nav a:hover,.main-left .nav li.active>a,.main-left .nav a.active,.main-left .nav .selected>a{background:var(--al-red)!important;color:#fff!important}
+.main-left .nav li.active>a,.main-left .nav .selected>a{border-left:4px solid var(--al-crimson)}
+
+/* cards & tables */
+.cbi-section,.cbi-map,.td,.table,.tr,.cbi-section-node{border-color:var(--al-border)!important}
+.cbi-section,.cbi-map>.cbi-section{background:var(--al-card)!important;border:1px solid var(--al-border);border-radius:6px}
+h2,h3,legend{color:var(--al-crimson)!important}
+a{color:var(--al-red)}
+
+/* buttons */
+.cbi-button-save,.cbi-button-apply,.cbi-button-action.important,.cbi-button-positive,
+.btn.cbi-button-save,.btn.cbi-button-apply,input.cbi-button-save,input.cbi-button-apply{background:var(--al-red)!important;border-color:var(--al-crimson)!important;color:#fff!important}
+.cbi-button-save:hover,.cbi-button-apply:hover{background:var(--al-crimson)!important}
+.cbi-button-reset,.cbi-button-remove,.cbi-button-negative{border-color:var(--al-red)!important;color:var(--al-red)!important}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--al-red)!important;border-color:var(--al-red)!important}
+.cbi-progressbar>div{background:var(--al-red)!important}
+
+/* footer */
+footer{background:var(--al-crimson)!important;color:#fff!important;text-align:center;padding:10px;font-size:0}
+footer *{display:none!important}
+footer::after{content:"ALAMEER SOFTWARE | Developed by Eng. Abdulrahim Al-Makhadhi";font-size:13px;color:#fff;display:block}
+
+/* login page */
+body.login,.login-container{background:var(--al-bg)!important}
+form.login,.login-container form{background:#fff;border:1px solid var(--al-border);border-radius:8px;border-top:6px solid var(--al-red);
+ box-shadow:0 2px 12px rgba(0,0,0,.12);max-width:420px;margin:30px auto;padding:20px}
+form.login::before{content:"";display:block;height:110px;margin-bottom:10px;background:url("/luci-static/alameer/logo-160.png") center/contain no-repeat}
+
+/* responsive */
+@media (max-width:900px){.main-left{width:100%!important}header .brand::after{content:""}}

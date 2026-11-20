@@ -1,0 +1,50 @@
+<%+header%>
+<style>
+.al-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:10px 0}
+.al-card{background:#fff;border:1px solid #c9ccd1;border-radius:6px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.al-card h3{margin:0 0 8px;color:#7A0D0D;font-size:1.05em;border-bottom:2px solid #8B0000;padding-bottom:4px}
+.al-card table{width:100%;border-collapse:collapse}
+.al-card td,.al-card th{padding:3px 4px;text-align:left;font-size:.92em;word-break:break-word}
+.al-wide{grid-column:1/-1;overflow-x:auto}
+.al-bar{background:#e4e6ea;border-radius:4px;height:14px;overflow:hidden;margin:4px 0}
+.al-bar>div{background:#8B0000;height:100%}
+.al-ok{color:#1b7a2e;font-weight:bold}.al-bad{color:#b00020;font-weight:bold}
+.al-log{max-height:240px;overflow:auto;background:#252525;color:#e8e8e8;padding:8px;font-size:.8em;white-space:pre-wrap;border-radius:4px}
+.al-hero{display:flex;align-items:center;gap:12px;margin-bottom:6px}.al-hero img{height:56px}
+</style>
+<div class="al-hero"><img src="/luci-static/alameer/logo-160.png" alt="ALAMEER SOFTWARE"><div><h2 style="margin:0">ALAMEER SOFTWARE Dashboard</h2><small id="al-sub"></small></div></div>
+<div class="al-grid" id="al-grid"><div class="al-card">Loading…</div></div>
+<script type="text/javascript">
+(function(){
+var URL='<%=url("admin/status/alameer/data")%>';
+function el(t,txt,cls){var e=document.createElement(t);if(txt!==undefined&&txt!==null)e.textContent=txt;if(cls)e.className=cls;return e}
+function fmtKB(k){return k>=1024?(k/1024).toFixed(1)+' MB':k+' KB'}
+function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+h+'h '+m+'m'}
+function card(title,cls){var c=el('div',null,'al-card'+(cls?' '+cls:''));c.appendChild(el('h3',title));return c}
+function kv(rows){var t=el('table');rows.forEach(function(r){var tr=el('tr');tr.appendChild(el('th',r[0]));tr.appendChild(el('td',r[1]));t.appendChild(tr)});return t}
+function bar(p){var b=el('div',null,'al-bar'),i=el('div');i.style.width=Math.max(0,Math.min(100,p))+'%';b.appendChild(i);return b}
+function table(head,rows){var t=el('table'),h=el('tr');head.forEach(function(x){h.appendChild(el('th',x))});t.appendChild(h);
+ rows.forEach(function(r){var tr=el('tr');r.forEach(function(c){tr.appendChild(el('td',c))});t.appendChild(tr)});return t}
+function render(d){
+ var g=document.getElementById('al-grid');g.textContent='';
+ document.getElementById('al-sub').textContent=d.hostname+' — mode: '+(d.mode||'?');
+ var c=card('System');c.appendChild(kv([['Hostname',d.hostname],['Model',d.model],['Board',d.board],
+  ['ALAMEER firmware',d.firmware.alameer+(d.firmware.build?' ('+d.firmware.build+')':'')],['Base',d.firmware.openwrt],['Uptime',fmtUp(d.uptime)]]));g.appendChild(c);
+ c=card('CPU');c.appendChild(kv([['SoC',d.cpu.type],['Core',d.cpu.model],['BogoMIPS',d.cpu.bogomips],
+  ['Load 1/5/15',d.load.map(function(x){return (x).toFixed?x.toFixed(2):x}).join(' / ')]]));g.appendChild(c);
+ var used=d.mem.total-(d.mem.available||d.mem.free);c=card('RAM');
+ c.appendChild(bar(d.mem.total?used*100/d.mem.total:0));
+ c.appendChild(kv([['Used',fmtKB(used)+' / '+fmtKB(d.mem.total)],['Available',fmtKB(d.mem.available||d.mem.free)],['Cached',fmtKB(d.mem.cached)]]));g.appendChild(c);
+ c=card('Flash');d.flash.forEach(function(f){c.appendChild(el('div',f.mount+': '+fmtKB(f.used)+' used of '+fmtKB(f.total)+' ('+fmtKB(f.avail)+' free)'));c.appendChild(bar(f.total?f.used*100/f.total:0))});g.appendChild(c);
+ c=card('Wireless');c.appendChild(table(['IF','Band','SSID','Ch','TX dBm','State'],d.wireless.map(function(w){return [w.ifname,w.band,w.ssid||'',w.channel||'',w.txpower===undefined?'':w.txpower,w.up?'up':'down']})));g.appendChild(c);
+ c=card('Ethernet ports (swconfig)');c.appendChild(table(['Port','Link','Speed'],d.ports.map(function(p){return [p.port,p.up?'up':'down',p.speed]})));g.appendChild(c);
+ c=card('Network interfaces');c.appendChild(table(['Name','Proto','Device','IPv4','Up'],d.interfaces.map(function(i){return [i.name,i.proto,i.device||'',i.ip,i.up?'yes':'no']})));g.appendChild(c);
+ c=card('Connected clients ('+d.clients.length+')','al-wide');c.appendChild(table(['MAC','IP','SSID','IF','Signal'],d.clients.map(function(x){return [x.mac,x.ip,x.ssid||'',x.iface,x.signal===undefined?'':x.signal+' dBm']})));g.appendChild(c);
+ c=card('Watchdog log','al-wide');var w=el('div',d.wdlog||'(no events)','al-log');c.appendChild(w);g.appendChild(c);
+ c=card('System log','al-wide');c.appendChild(el('div',d.log,'al-log'));g.appendChild(c);
+}
+function load(){var x=new XMLHttpRequest();x.open('GET',URL);x.onload=function(){try{render(JSON.parse(x.responseText))}catch(e){document.getElementById('al-grid').textContent='Error: '+e}};x.send()}
+load();setInterval(load,10000);
+})();
+</script>
+<%+footer%>

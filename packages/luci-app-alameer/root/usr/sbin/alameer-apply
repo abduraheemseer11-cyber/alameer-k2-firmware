@@ -1,0 +1,332 @@
+#!/bin/sh
+# ALAMEER SOFTWARE - alameer-apply
+# Validates and applies a network mode: ap | repeater | wisp | router
+# Usage: alameer-apply <mode|rollback> [--check] [--first-boot] [key=value ...]
+# Developed by Eng. Abdulrahim Al-Makhadhi
+. /lib/functions.sh
+
+BK=/etc/alameer
+PREV=$BK/prev
+CHECK=0; FIRST=0; MODE=""
+
+log() { logger -t alameer-apply "$*"; }
+die() { echo "ERROR: $*"; exit 1; }
+
+is_ip() {
+	echo "$1" | awk -F. 'NF==4 { for (i=1;i<=4;i++) if ($i !~ /^[0-9]+$/ || $i+0 > 255) exit 1; exit 0 } { exit 1 }'
+}
+is_mask() {
+	is_ip "$1" || return 1
+	echo "$1" | awk -F. '{ v=(($1*256+$2)*256+$3)*256+$4; if (v==0) exit 1; n=4294967296-v; while (n>1) { if (n%2) exit 1; n=n/2 } exit 0 }'
+}
+len_between() { l=${#1}; [ "$l" -ge "$2" ] && [ "$l" -le "$3" ]; }
+safe_text() { case "$1" in *[!A-Za-z0-9._\ @:/+=,-]*) return 1;; esac; return 0; }
+
+# ---- argument parsing ------------------------------------------------------
+MODE="$1"; shift
+for a in "$@"; do
+	case "$a" in
+		--check) CHECK=1 ;;
+		--first-boot) FIRST=1 ;;
+		*=*) k="${a%%=*}"; v="${a#*=}"
+		     case "$k" in *[!a-z0-9_]*|"") die "bad argument name";; esac
+		     eval "A_$k=\$v" ;;
+		*) die "unknown argument: $a" ;;
+	esac
+done
+
+cfg() { uci -q get "alameer.$1"; }
+
+# ---- helpers ---------------------------------------------------------------
+save_defaults() {
+	mkdir -p "$BK"
+	[ -f "$BK/network.default" ] && return 0
+	for f in network firewall dhcp; do cp "/etc/config/$f" "$BK/$f.default"; done
+}
+restore_defaults() {
+	for f in network firewall dhcp; do
+		[ -f "$BK/$f.default" ] || die "board default $f missing (run first boot provisioning)"
+		cp "$BK/$f.default" "/etc/config/$f"
+	done
+}
+backup_current() {
+	mkdir -p "$PREV"
+	for f in network wireless dhcp firewall alameer; do cp "/etc/config/$f" "$PREV/$f" 2>/dev/null; done
+}
+
+# Merge the WAN switch VLAN (vlan 2) into the LAN VLAN (vlan 1) so every
+# physical port joins br-lan. Only done when the swconfig layout is the
+# standard LAN=vlan1 / WAN=vlan2 layout generated from board.d.
+merge_switch() {
+	i=0; lan=""; wan=""
+	while uci -q get "network.@switch_vlan[$i]" >/dev/null; do
+		v="$(uci -q get "network.@switch_vlan[$i].vlan")"
+		[ "$v" = 1 ] && lan=$i
+		[ "$v" = 2 ] && wan=$i
+		i=$((i+1))
+	done
+	if [ -z "$lan" ] || [ -z "$wan" ]; then
+		log "non-standard switch layout: WAN port NOT merged into bridge"
+		echo "WARNING: switch layout is not the standard vlan1/vlan2; WAN port not merged."
+		return 1
+	fi
+	lp="$(uci get "network.@switch_vlan[$lan].ports")"
+	wp="$(uci get "network.@switch_vlan[$wan].ports")"
+	add=""
+	for p in $wp; do
+		case "$p" in *t|*@*) ;; *) add="$add $p" ;; esac
+	done
+	uci set "network.@switch_vlan[$lan].ports=$lp$add"
+	uci delete "network.@switch_vlan[$wan]"
+	return 0
+}
+
+# Find wifi-device sections by band (works for hwmode-style and band-style configs)
+find_radios() {
+	R2=""; R5=""
+	uci -q show wireless | grep -q "=wifi-device" || wifi config >/dev/null 2>&1
+	_cb() {
+		local b h
+		config_get b "$1" band ""; config_get h "$1" hwmode ""
+		case "$b$h" in
+			*2g*|*11g*|*11b*) R2="$1" ;;
+			*5g*|*11a*)       R5="$1" ;;
+		esac
+	}
+	config_load wireless
+	config_foreach _cb wifi-device
+	[ -n "$R2" ] || [ -n "$R5" ] || die "no wireless radios detected"
+}
+
+wipe_ifaces() {
+	while uci -q delete "wireless.@wifi-iface[0]"; do :; done
+}
+
+add_ap() { # name radio ssid enc key network
+	uci set "wireless.$1=wifi-iface"
+	uci set "wireless.$1.device=$2"
+	uci set "wireless.$1.mode=ap"
+	uci set "wireless.$1.network=$6"
+	uci set "wireless.$1.ssid=$3"
+	uci set "wireless.$1.encryption=$4"
+	[ "$4" != none ] && uci set "wireless.$1.key=$5"
+	[ "$7" = 1 ] && uci set "wireless.$1.wds=1"
+	return 0
+}
+
+country() { c="$(cfg core.country)"; echo "${c:-US}"; }
+
+build_wifi() { # sta_band(2g|5g|"") sta_network
+	find_radios
+	wipe_ifaces
+	cc="$(country)"
+	for r in $R2 $R5; do
+		uci set "wireless.$r.disabled=0"
+		uci set "wireless.$r.country=$cc"
+		uci -q delete "wireless.$r.txpower"   # leave TX power to driver/regdomain limits
+	done
+	[ -n "$R2" ] && add_ap alameer_ap_2g "$R2" "$S2_SSID" "$S2_ENC" "$S2_KEY" lan "$WDS_AP"
+	[ -n "$R5" ] && add_ap alameer_ap_5g "$R5" "$S5_SSID" "$S5_ENC" "$S5_KEY" lan "$WDS_AP"
+	if [ -n "$1" ]; then
+		if [ "$1" = 2g ]; then sr="$R2"; else sr="$R5"; fi
+		[ -n "$sr" ] || die "selected band $1 not available on this device"
+		uci set wireless.alameer_sta=wifi-iface
+		uci set wireless.alameer_sta.device="$sr"
+		uci set wireless.alameer_sta.mode=sta
+		uci set wireless.alameer_sta.network="$2"
+		uci set wireless.alameer_sta.ssid="$UP_SSID"
+		uci set wireless.alameer_sta.encryption="$UP_ENC"
+		[ "$UP_ENC" != none ] && uci set wireless.alameer_sta.key="$UP_KEY"
+		[ -n "$UP_BSSID" ] && uci set wireless.alameer_sta.bssid="$UP_BSSID"
+		[ "$WDS" = 1 ] && uci set wireless.alameer_sta.wds=1
+	fi
+}
+
+set_lan() {
+	uci set network.lan.proto=static
+	uci set network.lan.ipaddr="$LANIP"
+	uci set network.lan.netmask="$MASK"
+	uci -q delete network.lan.ip6assign
+	uci -q delete network.lan.gateway; uci -q delete network.lan.dns
+	[ -n "$GW" ] && uci set network.lan.gateway="$GW"
+	[ -n "$DNS" ] && uci set network.lan.dns="$DNS"
+	uci set system.@system[0].hostname="$HN"
+}
+
+zone_idx() { # name -> index of firewall zone
+	i=0
+	while uci -q get "firewall.@zone[$i]" >/dev/null; do
+		[ "$(uci -q get "firewall.@zone[$i].name")" = "$1" ] && { echo $i; return; }
+		i=$((i+1))
+	done
+}
+
+# ---- validation of common + mode fields ------------------------------------
+validate() {
+	case "$MODE" in ap|repeater|wisp|router) ;; *) die "unknown mode '$MODE'" ;; esac
+	HN="${A_hostname:-$(cfg core.hostname)}"; HN="${HN:-Al-Makhadhi-K2}"
+	LANIP="${A_lan_ip:-$(cfg core.lan_ip)}"; LANIP="${LANIP:-192.168.1.20}"
+	MASK="${A_netmask:-$(cfg core.netmask)}"; MASK="${MASK:-255.255.255.0}"
+	GW="${A_gateway-$(cfg core.gateway)}"; DNS="${A_dns-$(cfg core.dns)}"
+	echo "$HN" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$' || die "invalid hostname"
+	is_ip "$LANIP" || die "invalid LAN IP address"
+	is_mask "$MASK" || die "invalid netmask"
+	[ -z "$GW" ] || is_ip "$GW" || die "invalid gateway"
+	for d in $DNS; do is_ip "$d" || die "invalid DNS server: $d"; done
+	[ "$LANIP" != "0.0.0.0" ] && [ "${LANIP%%.*}" -lt 224 ] || die "LAN IP must be a unicast address"
+
+	S2_SSID="${A_ssid_2g:-$(cfg wifi_2g.ssid)}"; S2_ENC="${A_enc_2g:-$(cfg wifi_2g.encryption)}"; S2_KEY="${A_key_2g-$(cfg wifi_2g.key)}"
+	S5_SSID="${A_ssid_5g:-$(cfg wifi_5g.ssid)}"; S5_ENC="${A_enc_5g:-$(cfg wifi_5g.encryption)}"; S5_KEY="${A_key_5g-$(cfg wifi_5g.key)}"
+	for b in S2 S5; do
+		eval "ss=\$${b}_SSID en=\$${b}_ENC ky=\$${b}_KEY"
+		[ -n "$ss" ] && len_between "$ss" 1 32 || die "SSID must be 1-32 characters ($b)"
+		case "$en" in
+			none) ;;
+			psk2|sae-mixed|sae) len_between "$ky" 8 63 || die "Wi-Fi password must be 8-63 characters ($b)" ;;
+			*) die "unsupported encryption '$en' ($b)" ;;
+		esac
+	done
+	WDS_AP="${A_wds:-0}"; WDS="${A_wds:-0}"
+
+	case "$MODE" in
+		ap) ;;
+		repeater|wisp)
+			UP_BAND="$A_up_band"; UP_SSID="$A_up_ssid"; UP_ENC="${A_up_enc:-psk2}"; UP_KEY="$A_up_key"; UP_BSSID="$A_up_bssid"
+			case "$UP_BAND" in 2g|5g) ;; *) die "upstream band must be 2g or 5g" ;; esac
+			[ -n "$UP_SSID" ] && len_between "$UP_SSID" 1 32 || die "upstream SSID required (1-32 chars)"
+			case "$UP_ENC" in
+				none) ;;
+				psk|psk2|sae|sae-mixed) len_between "$UP_KEY" 8 63 || die "upstream password must be 8-63 characters" ;;
+				*) die "unsupported upstream encryption '$UP_ENC' (WEP/802.1X not supported)" ;;
+			esac
+			[ -z "$UP_BSSID" ] || echo "$UP_BSSID" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$' || die "invalid BSSID"
+			[ "$MODE" = repeater ] && [ "$WDS" != 1 ] && [ ! -f /lib/netifd/proto/relay.sh ] && die "relayd is not installed"
+			[ "$MODE" = wisp ] && WDS=0
+			;;
+		router)
+			WANP="${A_wan_proto:-dhcp}"
+			case "$WANP" in
+				dhcp) ;;
+				pppoe)
+					[ -f /lib/netifd/proto/ppp.sh ] || die "PPPoE needs ppp + ppp-mod-pppoe (not in this image; install with opkg or rebuild with PPPoE enabled)"
+					[ -n "$A_pppoe_user" ] && [ -n "$A_pppoe_pass" ] || die "PPPoE username/password required" ;;
+				*) die "unsupported WAN protocol" ;;
+			esac
+			DH_START="${A_dhcp_start:-100}"; DH_LIMIT="${A_dhcp_limit:-100}"
+			echo "$DH_START$DH_LIMIT" | grep -Eq '^[0-9]+$' || die "invalid DHCP range"
+			[ "$DH_START" -ge 2 ] && [ "$DH_START" -le 250 ] && [ "$DH_LIMIT" -ge 1 ] && [ $((DH_START+DH_LIMIT)) -le 254 ] || die "DHCP range out of bounds"
+			;;
+		*) die "unknown mode '$MODE'" ;;
+	esac
+}
+
+# ---- mode appliers ---------------------------------------------------------
+apply_ap() {
+	restore_defaults
+	merge_switch
+	uci -q delete network.wan; uci -q delete network.wan6
+	set_lan
+	uci set dhcp.lan.ignore=1
+	uci -q delete dhcp.lan.dhcpv6; uci -q delete dhcp.lan.ra
+	build_wifi "" ""
+}
+apply_repeater() {
+	restore_defaults
+	merge_switch
+	uci -q delete network.wan; uci -q delete network.wan6
+	set_lan
+	uci set dhcp.lan.ignore=1
+	if [ "$WDS" = 1 ]; then
+		# True L2 (4addr WDS) client: STA joins br-lan directly. Needs WDS on the upstream AP too.
+		build_wifi "$UP_BAND" lan
+	else
+		# relayd pseudo-bridge: upstream via wwan (DHCP), relayed into lan. NOT a true L2 bridge.
+		uci set network.wwan=interface; uci set network.wwan.proto=dhcp
+		uci set network.stabridge=interface; uci set network.stabridge.proto=relay
+		uci set network.stabridge.network='lan wwan'; uci set network.stabridge.ipaddr="$LANIP"
+		build_wifi "$UP_BAND" wwan
+		z="$(zone_idx lan)"; [ -n "$z" ] && uci add_list "firewall.@zone[$z].network=wwan"
+	fi
+}
+apply_wisp() {
+	restore_defaults
+	uci -q delete network.wan; uci -q delete network.wan6
+	# switch left as shipped: all physical LAN ports on br-lan; the WAN port is unused in WISP mode
+	set_lan
+	uci set dhcp.lan.ignore=0; uci set dhcp.lan.start=100; uci set dhcp.lan.limit=100
+	uci set network.wwan=interface; uci set network.wwan.proto=dhcp
+	build_wifi "$UP_BAND" wwan
+	z="$(zone_idx wan)"; [ -n "$z" ] && uci set "firewall.@zone[$z].network=wwan"
+}
+apply_router() {
+	restore_defaults
+	set_lan
+	uci set dhcp.lan.ignore=0; uci set dhcp.lan.start="$DH_START"; uci set dhcp.lan.limit="$DH_LIMIT"
+	uci -q delete network.wan6
+	if [ "$WANP" = pppoe ]; then
+		uci set network.wan.proto=pppoe
+		uci set network.wan.username="$A_pppoe_user"; uci set network.wan.password="$A_pppoe_pass"
+	else
+		uci set network.wan.proto=dhcp
+	fi
+	build_wifi "" ""
+	# AP SSIDs attach to lan in router mode as well (build_wifi uses lan)
+}
+
+commit_all() {
+	uci set alameer.core.mode="$MODE"
+	uci set alameer.core.hostname="$HN"; uci set alameer.core.lan_ip="$LANIP"; uci set alameer.core.netmask="$MASK"
+	uci set alameer.core.gateway="$GW"; uci set alameer.core.dns="$DNS"
+	uci set alameer.wifi_2g.ssid="$S2_SSID"; uci set alameer.wifi_2g.encryption="$S2_ENC"
+	uci set alameer.wifi_5g.ssid="$S5_SSID"; uci set alameer.wifi_5g.encryption="$S5_ENC"
+	uci commit
+	# lldpd advertises the hostname
+	[ -x /usr/sbin/lldpd ] && { uci -q set lldpd.config.lldp_hostname="$HN"; uci -q commit lldpd; }
+	# DHCP/firewall services follow the mode
+	case "$MODE" in
+		ap|repeater) /etc/init.d/dnsmasq disable >/dev/null 2>&1 ;;
+		*) /etc/init.d/dnsmasq enable >/dev/null 2>&1 ;;
+	esac
+}
+
+reload_services() {
+	( sleep 3
+	  /etc/init.d/network restart
+	  sleep 5
+	  case "$MODE" in
+		ap|repeater) /etc/init.d/dnsmasq stop; /etc/init.d/firewall restart ;;
+		*) /etc/init.d/dnsmasq restart; /etc/init.d/firewall restart ;;
+	  esac
+	  [ -x /etc/init.d/lldpd ] && /etc/init.d/lldpd restart
+	) >/dev/null 2>&1 &
+}
+
+# ---- main -----------------------------------------------------------------
+if [ "$MODE" = rollback ]; then
+	[ -f "$PREV/network" ] || die "no previous configuration saved"
+	for f in network wireless dhcp firewall alameer; do [ -f "$PREV/$f" ] && cp "$PREV/$f" "/etc/config/$f"; done
+	log "rolled back to previous configuration"
+	MODE="$(uci -q get alameer.core.mode)"
+	reload_services
+	echo "OK: rolled back, network restarting"
+	exit 0
+fi
+
+[ "$FIRST" = 1 ] && save_defaults
+[ -f "$BK/network.default" ] || save_defaults
+validate
+[ "$CHECK" = 1 ] && { echo "OK: configuration is valid for mode '$MODE'"; exit 0; }
+
+backup_current
+case "$MODE" in
+	ap) apply_ap ;; repeater) apply_repeater ;; wisp) apply_wisp ;; router) apply_router ;;
+esac
+commit_all
+log "applied mode $MODE ip=$LANIP"
+if [ "$FIRST" = 1 ]; then
+	echo "OK: first-boot defaults applied (no restart needed)"
+else
+	reload_services
+	echo "OK: mode '$MODE' applied. Network is restarting; reconnect to http://$LANIP/ in ~30 s. Use Rollback if you lose access."
+fi
+exit 0

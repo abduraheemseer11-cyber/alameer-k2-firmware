@@ -1,0 +1,94 @@
+<%+header%>
+<style>
+.qs-card{background:#fff;border:1px solid #c9ccd1;border-radius:6px;padding:14px;margin:10px 0}
+.qs-card h3{margin:0 0 8px;color:#7A0D0D;border-bottom:2px solid #8B0000;padding-bottom:4px}
+.qs-row{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0;align-items:center}
+.qs-row label{min-width:150px;font-weight:bold}.qs-row input,.qs-row select{flex:1;min-width:160px;max-width:360px}
+.qs-modes label{display:block;border:2px solid #c9ccd1;border-radius:6px;padding:8px 12px;margin:6px 0;cursor:pointer;min-width:0;font-weight:normal}
+.qs-modes input:checked+span{color:#7A0D0D;font-weight:bold}
+#qs-msg{padding:10px;border-radius:4px;margin:10px 0;display:none;white-space:pre-wrap}
+.qs-ok{background:#e7f5ea;border:1px solid #1b7a2e}.qs-err{background:#fdeaea;border:1px solid #b00020}
+.qs-note{font-size:.88em;color:#555}
+</style>
+<h2>ALAMEER Quick Setup</h2>
+<div id="qs-msg"></div>
+<div class="qs-card qs-modes"><h3>1. Mode</h3>
+ <label><input type="radio" name="mode" value="ap" checked> <span>Access Point / MikroTik Bridge (default)</span><br><small>All Ethernet ports (incl. WAN) join br-lan, DHCP and NAT disabled, management at the LAN IP below.</small></label>
+ <label><input type="radio" name="mode" value="repeater"> <span>Repeater (relayd, or WDS)</span><br><small>Joins an upstream Wi-Fi and re-broadcasts it. relayd = pseudo-bridge (not true Layer 2); WDS = true Layer 2 only if the upstream AP also uses WDS.</small></label>
+ <label><input type="radio" name="mode" value="wisp"> <span>WISP (Wi-Fi client as WAN + NAT)</span><br><small>Upstream Wi-Fi is the WAN; this router does NAT, firewall and DHCP for its own LAN.</small></label>
+ <label><input type="radio" name="mode" value="router"> <span>Router (WAN port + NAT + DHCP)</span><br><small>WAN port separated from LAN; NAT, firewall and DHCP server enabled.</small></label>
+</div>
+<div class="qs-card"><h3>2. Management / LAN</h3>
+ <div class="qs-row"><label>Hostname</label><input id="hostname"></div>
+ <div class="qs-row"><label>LAN IP</label><input id="lan_ip"></div>
+ <div class="qs-row"><label>Netmask</label><input id="netmask"></div>
+ <div class="qs-row"><label>Gateway (optional)</label><input id="gateway"></div>
+ <div class="qs-row"><label>DNS (optional)</label><input id="dns" placeholder="space separated"></div>
+</div>
+<div class="qs-card"><h3>3. Wi-Fi access points</h3>
+ <div class="qs-row"><label>2.4 GHz SSID</label><input id="ssid_2g"><select id="enc_2g"></select><input id="key_2g" type="password" placeholder="password (if secured)"></div>
+ <div class="qs-row"><label>5 GHz SSID</label><input id="ssid_5g"><select id="enc_5g"></select><input id="key_5g" type="password" placeholder="password (if secured)"></div>
+ <p class="qs-note">Open networks are the project default. Choose WPA2 / WPA2+WPA3 to secure them. Country code and TX power follow the device and regulatory limits; they are not overridden.</p>
+</div>
+<div class="qs-card" id="p-up" style="display:none"><h3>4. Upstream Wi-Fi</h3>
+ <div class="qs-row"><label>Band</label><select id="up_band"><option value="2g">2.4 GHz</option><option value="5g">5 GHz</option></select>
+  <button class="cbi-button" id="scan" type="button">Scan networks</button></div>
+ <div class="qs-row"><label>Networks</label><select id="scanlist" size="6" style="width:100%;max-width:560px"></select></div>
+ <div class="qs-row"><label>SSID</label><input id="up_ssid"></div>
+ <div class="qs-row"><label>BSSID (optional)</label><input id="up_bssid"></div>
+ <div class="qs-row"><label>Encryption</label><select id="up_enc"><option value="none">None</option><option value="psk2" selected>WPA2-PSK</option><option value="psk">WPA-PSK</option><option value="sae">WPA3-SAE</option><option value="sae-mixed">WPA2/WPA3</option></select></div>
+ <div class="qs-row"><label>Password</label><input id="up_key" type="password"></div>
+ <div class="qs-row" id="p-wds"><label>WDS (4addr)</label><input type="checkbox" id="wds" style="flex:0;min-width:0"> <span class="qs-note">Repeater only: true Layer 2 if the upstream AP supports WDS; otherwise leave off to use relayd.</span></div>
+ <p class="qs-note">Scanning briefly interrupts Wi-Fi clients on that radio. Scan results for the radio you are connected through may disconnect you.</p>
+</div>
+<div class="qs-card" id="p-router" style="display:none"><h3>4. Router options</h3>
+ <div class="qs-row"><label>WAN protocol</label><select id="wan_proto"><option value="dhcp">DHCP client</option><option value="pppoe">PPPoE</option></select></div>
+ <div class="qs-row" id="p-ppp" style="display:none"><label>PPPoE user</label><input id="pppoe_user"><label>PPPoE password</label><input id="pppoe_pass" type="password"></div>
+ <p class="qs-note" id="ppp-note" style="display:none">PPPoE packages are not included in this image (flash size). Install ppp + ppp-mod-pppoe with opkg first.</p>
+ <div class="qs-row"><label>DHCP start</label><input id="dhcp_start" value="100"><label>DHCP limit</label><input id="dhcp_limit" value="100"></div>
+</div>
+<div class="cbi-page-actions">
+ <button class="cbi-button cbi-button-save" id="btn-check" type="button">Validate</button>
+ <button class="cbi-button cbi-button-apply" id="btn-apply" type="button">Apply Configuration</button>
+ <button class="cbi-button cbi-button-reset" id="btn-rb" type="button">Rollback to previous</button>
+</div>
+<script type="text/javascript">
+(function(){
+var T='<%=token%>',BASE='<%=url("admin/network/alameer")%>';
+function $(i){return document.getElementById(i)}
+function mode(){return document.querySelector('input[name=mode]:checked').value}
+function opt(sel,list){list.forEach(function(o){var e=document.createElement('option');e.value=o[0];e.textContent=o[1];sel.appendChild(e)})}
+var ENC=[['none','Open (none)'],['psk2','WPA2-PSK'],['sae-mixed','WPA2/WPA3']];
+opt($('enc_2g'),ENC);opt($('enc_5g'),ENC);
+function msg(t,ok){var m=$('qs-msg');m.textContent=t;m.className=ok?'qs-ok':'qs-err';m.style.display='block';window.scrollTo(0,0)}
+function panels(){var m=mode();$('p-up').style.display=(m==='repeater'||m==='wisp')?'block':'none';
+ $('p-router').style.display=m==='router'?'block':'none';$('p-wds').style.display=m==='repeater'?'flex':'none'}
+Array.prototype.forEach.call(document.querySelectorAll('input[name=mode]'),function(r){r.onchange=panels});
+$('wan_proto').onchange=function(){var p=$('wan_proto').value==='pppoe';$('p-ppp').style.display=p?'flex':'none';$('ppp-note').style.display=(p&&!PPP)?'block':'none'};
+var PPP=false;
+function post(params,cb){var x=new XMLHttpRequest();x.open('POST',BASE+'/'+params._ep);var b='token='+encodeURIComponent(T);
+ for(var k in params){if(k!=='_ep'&&params[k]!==undefined)b+='&'+encodeURIComponent(k)+'='+encodeURIComponent(params[k])}
+ x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+ x.onload=function(){try{cb(JSON.parse(x.responseText))}catch(e){msg('Unexpected response: '+x.status,false)}};x.onerror=function(){msg('Connection lost (the router may be restarting its network).',false)};x.send(b)}
+function collect(){var p={_ep:'apply',mode:mode()};
+ ['hostname','lan_ip','netmask','gateway','dns','ssid_2g','enc_2g','key_2g','ssid_5g','enc_5g','key_5g'].forEach(function(k){p[k]=$(k).value});
+ var m=p.mode;
+ if(m==='repeater'||m==='wisp'){['up_band','up_ssid','up_bssid','up_enc','up_key'].forEach(function(k){p[k]=$(k).value});if(m==='repeater')p.wds=$('wds').checked?'1':'0'}
+ if(m==='router'){['wan_proto','dhcp_start','dhcp_limit'].forEach(function(k){p[k]=$(k).value});if(p.wan_proto==='pppoe'){p.pppoe_user=$('pppoe_user').value;p.pppoe_pass=$('pppoe_pass').value}}
+ return p}
+$('btn-check').onclick=function(){var p=collect();p.check='1';post(p,function(r){msg(r.message,r.ok)})};
+$('btn-apply').onclick=function(){if(!confirm('Apply this configuration? The network will restart and you may need to reconnect to the new LAN IP.'))return;
+ var p=collect();p.check='1';post(p,function(r){if(!r.ok){msg(r.message,false);return}p.check=undefined;post(p,function(r2){msg(r2.message,r2.ok)})})};
+$('btn-rb').onclick=function(){if(!confirm('Restore the configuration saved before the last Apply?'))return;post({_ep:'apply',mode:'rollback'},function(r){msg(r.message,r.ok)})};
+$('scan').onclick=function(){var l=$('scanlist');l.textContent='';var o=document.createElement('option');o.textContent='Scanning…';l.appendChild(o);
+ post({_ep:'scan',band:$('up_band').value},function(r){l.textContent='';if(!r.ok||!r.networks.length){var e=document.createElement('option');e.textContent=r.ok?'No networks found':(r.error||'scan failed');l.appendChild(e);return}
+  r.networks.forEach(function(n){var e=document.createElement('option');e.value=JSON.stringify(n);e.textContent=n.ssid+'  |  ch '+n.channel+'  |  '+n.signal+' dBm  |  '+n.enc+(n.supported?'':' (unsupported)');l.appendChild(e)})})};
+$('scanlist').onchange=function(){try{var n=JSON.parse($('scanlist').value);if(!n.supported){msg('This network uses '+n.enc+', which this firmware does not support as an upstream.',false);return}
+ $('up_ssid').value=n.ssid;$('up_bssid').value=n.bssid||'';$('up_enc').value=n.enc}catch(e){}};
+var x=new XMLHttpRequest();x.open('GET',BASE+'/state');x.onload=function(){var s=JSON.parse(x.responseText);PPP=s.pppoe;
+ ['hostname','lan_ip','netmask','gateway','dns','ssid_2g','ssid_5g'].forEach(function(k){$(k).value=s[k]||''});$('enc_2g').value=s.enc_2g||'none';$('enc_5g').value=s.enc_5g||'none';
+ var r=document.querySelector('input[name=mode][value='+(s.mode||'ap')+']');if(r)r.checked=true;panels()};x.send();
+panels();
+})();
+</script>
+<%+footer%>
