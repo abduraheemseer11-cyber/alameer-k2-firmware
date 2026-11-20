@@ -1,0 +1,26 @@
+#!/bin/sh
+# ALAMEER SOFTWARE - diagnostics for IP / Wi-Fi problems. Read-only: changes nothing.
+# Run on the router:  alameer-diag   (copy the output when asking for support)
+sec() { echo; echo "=== $* ==="; }
+sec "firmware"; cat /etc/alameer_release 2>/dev/null; cat /etc/openwrt_release 2>/dev/null | head -n 4
+sec "board"; cat /tmp/sysinfo/model /tmp/sysinfo/board_name 2>/dev/null
+sec "LAN settings (UCI)"
+echo "network.lan.ipaddr   = $(uci -q get network.lan.ipaddr)"
+echo "network.lan.netmask  = $(uci -q get network.lan.netmask)"
+echo "system hostname      = $(uci -q get system.@system[0].hostname)"
+echo "alameer.core.mode    = $(uci -q get alameer.core.mode)"
+echo "alameer.core.lan_ip  = $(uci -q get alameer.core.lan_ip)"
+sec "LAN settings (live)"; ip -4 addr show br-lan 2>/dev/null | grep inet
+sec "first-boot log"; cat /etc/alameer/first-boot.log 2>/dev/null || echo "(none)"
+echo "wifi.pending marker: $( [ -f /etc/alameer/wifi.pending ] && echo YES || echo no )"
+sec "flash layout (/proc/mtd)"; cat /proc/mtd
+sec "kernel modules (wireless)"; lsmod 2>/dev/null | grep -E 'mt76|mt7615|rt2|rt28|mac80211|cfg80211' || echo "(none loaded!)"
+sec "PCI devices (MT7612E should appear)"; ls /sys/bus/pci/devices 2>/dev/null | while read d; do echo "$d $(cat /sys/bus/pci/devices/$d/vendor 2>/dev/null):$(cat /sys/bus/pci/devices/$d/device 2>/dev/null)"; done
+sec "phy list"; ls /sys/class/ieee80211 2>/dev/null || echo "(no phy at all)"
+sec "wireless config (UCI)"; uci -q show wireless
+sec "wifi status"; wifi status 2>&1 | head -n 80
+sec "iwinfo"; iwinfo 2>&1 | head -n 60
+sec "kernel log (wireless / eeprom / calibration)"
+dmesg 2>/dev/null | grep -iE 'mt76|rt2800|rt28|ieee80211|phy[0-9]|eeprom|calib|factory|pci|regulatory|cfg80211' | tail -n 60
+sec "system log (netifd / hostapd / wifi / alameer)"
+logread 2>/dev/null | grep -iE 'netifd|hostapd|wpa_|wifi|alameer|radio' | tail -n 60
