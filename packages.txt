@@ -1,32 +1,57 @@
-# Core LuCI web interface and required tools
-luci
-luci-ssl
-luci-app-firewall
-luci-theme-bootstrap
-
-# MT7612E 5 GHz driver is normally part of the device profile; list explicitly too.
-kmod-mt76x2
-
-# Full hostapd/wpa_supplicant build with AP/STA/WDS/Mesh support.
--wpad-basic-mbedtls
--wpad-basic-wolfssl
--wpad-basic-openssl
--wpad-mini
--wpad-wolfssl
-wpad-mesh-wolfssl
-
-# Wireless diagnostics and repeater bridge helper
-iw
-iwinfo
-wireless-regdb
-relayd
-luci-proto-relay
-
-# Keep this build lean on an 8 MB flash device
--odhcp6c
+# OpenWrt 23.05.3 ImageBuilder packages for Phicomm K2 v22.5
+# Remove LuCI completely: ALAMEER is an independent web application.
+-luci
+-luci-base
+-luci-mod-admin-full
+-luci-theme-bootstrap
+-luci-theme-argon
+-rpcd-mod-luci
+-dropbear
+-dnsmasq
+-dnsmasq-full
+-odhcpd
 -odhcpd-ipv6only
--ip6tables
--kmod-ip6tables
+-odhcp6c
+-unbound
+-firewall
+-firewall4
+-nftables
+-iptables
 -ppp
 -ppp-mod-pppoe
--luci-proto-ppp
+-uhttpd-mod-tls
+-luci-ssl
+-luci-ssl-openssl
+-libustream-mbedtls
+-libustream-openssl
+-libustream-wolfssl
+-uclient-fetch
+-kmod-ipv6
+-luci-proto-ipv6
+-kmod-usb-core
+-kmod-usb2
+-kmod-usb-ohci
+-kmod-usb-ehci
+
+# Minimal HTTP + JSON-RPC backend for the custom dashboard
+uhttpd
+uhttpd-mod-ubus
+rpcd
+rpcd-mod-iwinfo
+rpcd-mod-file
+rpcd-mod-rpcsys
+iwinfo
+
+# K2 dual-band wireless drivers and WPA2 support
+kmod-rt2800-soc
+kmod-mt76x2
+wpad-basic-mbedtls
+
+# AP / bridge / neighbor discovery utilities
+lldpd
+relayd
+bridge
+
+# Timezone and scheduled tasks
+zoneinfo-asia
+cron

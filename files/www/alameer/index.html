@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#a90018">
+<title>ALAMEER SOFTWARE | Network Control</title>
+<link rel="icon" href="/alameer/assets/favicon.png">
+<link rel="stylesheet" href="/alameer/assets/app.css">
+</head>
+<body>
+<div id="login" class="login-screen">
+ <div class="login-card"><img src="/alameer/assets/logo.png" class="login-logo"><div class="brand-title">ALAMEER <span>SOFTWARE</span></div>
+ <p class="muted">Network Management System</p>
+ <form id="loginForm"><label>Username</label><input id="username" value="root" autocomplete="username" required>
+ <label>Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Initial password: admin" required>
+ <button class="btn primary full">Sign in</button><div id="loginError" class="error"></div></form>
+ <small>Connect to the router LAN and open http://192.168.1.20</small></div>
+</div>
+<div id="app" class="app hidden">
+ <header class="topbar"><button id="mobileMenu" class="icon-btn" aria-label="Menu">☰</button>
+  <div class="brand"><img src="/alameer/assets/logo.png"><div><b>ALAMEER <span>SOFTWARE</span></b><small>NETWORK CONTROL CENTER</small></div></div>
+  <div class="device-name"><b id="hostname">Al-Makhadhi-K2</b><small>Phicomm K2 · OpenWrt Custom</small></div>
+  <div class="top-stats"><div><small>CPU</small><b id="cpuTop">—</b></div><div><small>RAM</small><b id="ramTop">—</b></div><div><small>UPTIME</small><b id="uptimeTop">—</b></div></div>
+  <button id="themeToggle" class="theme-btn">☾ <span>Dark</span></button><button id="logout" class="logout">Sign out</button>
+ </header>
+ <aside class="sidebar" id="sidebar">
+  <div class="side-caption">MANAGEMENT</div>
+  <button class="nav active" data-page="dashboard"><i>▦</i> Dashboard</button>
+  <button class="nav" data-page="quick"><i>✦</i> Quick Setup</button>
+  <button class="nav" data-page="wireless"><i>◉</i> Wireless</button>
+  <button class="nav" data-page="lan"><i>⌘</i> LAN & VLAN</button>
+  <button class="nav" data-page="clients"><i>♧</i> Connected Clients</button>
+  <div class="side-caption">SYSTEM</div>
+  <button class="nav" data-page="system"><i>⚙</i> System Information</button>
+  <button class="nav danger-nav" id="reboot"><i>⟳</i> Reboot Device</button>
+  <div class="side-foot"><img src="/alameer/assets/logo.png"><b>ALAMEER SOFTWARE</b><small>Smart Network. Better Performance.</small></div>
+ </aside>
+ <main class="main">
+  <section class="page" id="page-dashboard">
+   <div class="welcome"><div><span class="eyebrow">NETWORK OVERVIEW</span><h1>Good day, Administrator</h1><p>Everything is running from one control center.</p></div><div class="live-pill"><span></span> LIVE DEVICE STATUS</div></div>
+   <div class="metric-grid">
+    <article class="metric"><div class="metric-icon red">◉</div><div><small>CPU LOAD AVG</small><strong id="cpu">—</strong><small class="sub">Processor utilization</small></div><div class="ring" id="cpuRing">—</div></article>
+    <article class="metric"><div class="metric-icon green">▤</div><div><small>MEMORY USAGE</small><strong id="ram">—</strong><small class="sub" id="ramDetail">Available memory</small></div><div class="ring green-ring" id="ramRing">—</div></article>
+    <article class="metric"><div class="metric-icon purple">◷</div><div><small>UPTIME</small><strong id="uptime">—</strong><small class="sub">Since last reboot</small></div></article>
+   </div>
+   <div class="dashboard-grid">
+    <article class="panel"><div class="panel-head"><div><span class="eyebrow">WIRELESS</span><h2>Wireless Networks</h2></div><span class="tag online">RADIOS</span></div><div id="radioCards" class="radio-cards"><div class="empty">Loading radio status…</div></div></article>
+    <article class="panel quick-panel"><div class="panel-head"><div><span class="eyebrow">SHORTCUTS</span><h2>Quick Actions</h2></div></div><button class="action-tile" data-goto="quick"><span>✦</span><div><b>Quick Setup</b><small>Configure your wireless network</small></div>›</button><button class="action-tile" data-goto="lan"><span>⌘</span><div><b>LAN Settings</b><small>Change management IP and VLAN</small></div>›</button><button class="action-tile" data-goto="clients"><span>♧</span><div><b>View Clients</b><small>See connected wireless devices</small></div>›</button></article>
+    <article class="panel"><div class="panel-head"><div><span class="eyebrow">HARDWARE</span><h2>Device Information</h2></div></div><div class="info-list"><div><span>Model</span><b id="model">Phicomm K2</b></div><div><span>Hostname</span><b id="hostInfo">—</b></div><div><span>Firmware</span><b id="firmware">OpenWrt 23.05.3</b></div><div><span>Local IP</span><b id="ipInfo">192.168.1.20</b></div></div></article>
+    <article class="panel"><div class="panel-head"><div><span class="eyebrow">NETWORK</span><h2>LAN Interface</h2></div><span class="tag online" id="lanState">CHECKING</span></div><div class="lan-visual"><div class="lan-symbol">⇄</div><div><b id="lanAddress">192.168.1.20/24</b><small>Bridge interface · br-lan</small></div></div><p class="hint">DHCP and DNS services are provided by your upstream MikroTik router.</p></article>
+   </div>
+  </section>
+  <section class="page hidden" id="page-quick">
+   <div class="page-heading"><div><span class="eyebrow">SIMPLE CONFIGURATION</span><h1>Quick Setup</h1><p>Set the essential network options without complex menus.</p></div></div>
+   <div class="tabs"><button class="tab active" data-tab="basic">Basic Settings</button><button class="tab" data-tab="more">More Settings</button></div>
+   <div id="tab-basic" class="tab-content">
+    <div class="panel form-panel"><h2>Operation Mode</h2><div class="mode-choice"><label class="mode-card selected"><input type="radio" name="mode" value="ap" checked><span class="mode-icon">▣</span><b>Access Point</b><small>Bridge wired ports and provide Wi-Fi access.</small></label><label class="mode-card disabled-mode"><input type="radio" name="mode" value="repeater" disabled><span class="mode-icon">⌁</span><b>Repeater / WDS</b><small>Not enabled in this build.</small></label></div><p class="hint">This firmware is preconfigured as a Layer-2 access point. Repeater scanning and relay configuration are not yet implemented.</p></div>
+    <div class="form-grid">
+     <div class="panel form-panel"><h2>2.4 GHz Wireless</h2><label>Network name (SSID)<input id="ssid24" value="AbduRaheem_2G"></label><label>Security<select id="sec24"><option value="none">Open network</option><option value="psk2">WPA2 Personal</option></select></label><label>Wi-Fi password<input id="pass24" type="password" placeholder="At least 8 characters"></label><div class="two-col"><label>Channel<select id="ch24"><option value="auto">Auto</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option></select></label><label>Width<select id="width24"><option>HT20</option><option>HT40</option></select></label></div><div class="two-col"><label>TX power (dBm)<input id="power24" type="number" min="1" max="30" value="30"></label><label class="check-label"><input id="hide24" type="checkbox"> Hide SSID</label></div><label class="check-label"><input id="isolate24" type="checkbox" checked> Client isolation</label></div>
+     <div class="panel form-panel"><h2>5 GHz Wireless</h2><label>Network name (SSID)<input id="ssid5" value="AbduRaheem_5G"></label><label>Security<select id="sec5"><option value="none">Open network</option><option value="psk2">WPA2 Personal</option></select></label><label>Wi-Fi password<input id="pass5" type="password" placeholder="At least 8 characters"></label><div class="two-col"><label>Channel<select id="ch5"><option value="auto">Auto</option><option>36</option><option>40</option><option>44</option><option>48</option><option>149</option><option>153</option><option>157</option><option>161</option></select></label><label>Width<select id="width5"><option>VHT20</option><option selected>VHT40</option><option>VHT80</option></select></label></div><div class="two-col"><label>TX power (dBm)<input id="power5" type="number" min="1" max="30" value="24"></label><label class="check-label"><input id="hide5" type="checkbox"> Hide SSID</label></div><label class="check-label"><input id="isolate5" type="checkbox" checked> Client isolation</label></div>
+    </div>
+    <div class="form-actions"><button class="btn primary" id="applyWireless">Save & Apply</button><span id="wirelessMsg" class="status-msg"></span></div>
+   </div>
+   <div id="tab-more" class="tab-content hidden"><div class="panel form-panel"><h2>LAN & Administration</h2><div class="form-grid"><label>Router IP address<input id="lanIp" value="192.168.1.20"></label><label>Subnet mask<select id="lanMask"><option value="255.255.255.0">255.255.255.0 (/24)</option><option value="255.255.0.0">255.255.0.0 (/16)</option></select></label><label>Gateway (optional)<input id="gateway" placeholder="192.168.1.1"></label><label>VLAN ID (optional)<input id="vlan" type="number" min="1" max="4094" placeholder="Not configured"></label></div><p class="hint">Changing the management IP may disconnect this page. Reconnect using the new address. VLAN tagging is not automatically created by this simple IP form.</p><div class="form-actions"><button class="btn primary" id="applyLan">Save LAN Settings</button><span id="lanMsg" class="status-msg"></span></div></div><div class="panel form-panel"><h2>Maintenance</h2><div class="setting-row"><div><b>Automatic daily reboot</b><small>Scheduled at 04:00 local time by system cron.</small></div><span class="tag online">ENABLED</span></div><div class="setting-row"><div><b>Physical Reset button protection</b><small>Cannot be safely disabled through this software interface on this hardware.</small></div><span class="tag warning">NOT AVAILABLE</span></div></div></div>
+  </section>
+  <section class="page hidden" id="page-wireless"><div class="page-heading"><div><span class="eyebrow">RADIO MANAGEMENT</span><h1>Wireless Networks</h1><p>Current wireless radio information.</p></div><button class="btn secondary" id="refreshWireless">Refresh</button></div><div id="wirelessDetails" class="radio-cards"></div></section>
+  <section class="page hidden" id="page-lan"><div class="page-heading"><div><span class="eyebrow">WIRED NETWORK</span><h1>LAN & VLAN</h1><p>Management interface and bridge status.</p></div></div><div class="panel form-panel"><h2>Bridge Overview</h2><div class="info-list"><div><span>Bridge</span><b>br-lan</b></div><div><span>Protocol</span><b>Static IPv4</b></div><div><span>Address</span><b id="lanDetailIp">192.168.1.20/24</b></div><div><span>DHCP server</span><b>Not installed on this device</b></div><div><span>Upstream DHCP/DNS</span><b>MikroTik / upstream network</b></div></div><button class="btn primary" data-goto="quick" data-open-tab="more">Edit LAN settings</button></div></section>
+  <section class="page hidden" id="page-clients"><div class="page-heading"><div><span class="eyebrow">WIRELESS USERS</span><h1>Connected Clients</h1><p>Associated stations reported by the wireless driver.</p></div><button class="btn secondary" id="refreshClients">Refresh</button></div><div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Radio</th><th>MAC Address</th><th>Signal</th><th>RX / TX</th></tr></thead><tbody id="clientRows"><tr><td colspan="4">Loading client list…</td></tr></tbody></table></div><p class="hint">IP addresses may not be available because DHCP is handled by the upstream router and this firmware does not include dnsmasq.</p></div></section>
+  <section class="page hidden" id="page-system"><div class="page-heading"><div><span class="eyebrow">DEVICE DETAILS</span><h1>System Information</h1><p>Hardware and firmware status.</p></div></div><div class="panel form-panel"><div class="info-list"><div><span>Board</span><b id="sysBoard">—</b></div><div><span>Model</span><b id="sysModel">—</b></div><div><span>Kernel</span><b id="sysKernel">—</b></div><div><span>Hostname</span><b id="sysHostname">—</b></div><div><span>Local IP</span><b id="sysIp">—</b></div><div><span>Uptime</span><b id="sysUptime">—</b></div></div><p class="hint">For recovery and firmware upgrades, use the Breed bootloader. SSH and HTTPS are intentionally not included.</p></div>
+  <div class="panel form-panel"><h2>Change Administrator Password</h2><div class="form-grid"><label>New password<input id="newPassword" type="password" minlength="8" autocomplete="new-password"></label><label>Confirm new password<input id="confirmPassword" type="password" minlength="8" autocomplete="new-password"></label></div><button class="btn primary" id="changePassword">Update Password</button><span id="passwordMsg" class="status-msg"></span><p class="hint">Use at least 8 characters. You will need to sign in again with the new password.</p></div></section>
+  <footer>© ALAMEER SOFTWARE · Custom Network Management Interface</footer>
+ </main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="/alameer/assets/app.js"></script>
+</body></html>
