@@ -1,31 +1,18 @@
-# Installation (read fully before flashing)
+# Installation — read before flashing
 
-## 0. Is this the right firmware for your unit?
-Only for Phicomm K2 / PSG1218 with the **v22.5-or-newer** flash layout (`phicomm_k2-v22.5`). See HARDWARE.md.
-For v22.4 or older, build a different profile (`phicomm_k2-v22.4`); do not use this image.
+## Confirm the hardware
+This image targets Phicomm K2 v22.5 or newer with the `phicomm_k2-v22.5` layout only. Do not flash it to v22.4 or an unverified board revision. Back up the factory/calibration partition before making changes.
 
-## 1. Back up the calibration data (strongly recommended)
-From an OpenWrt shell on the router: `grep factory /proc/mtd`, then (replace N)
-`dd if=/dev/mtdN of=/tmp/factory.bin` and copy it off with `scp`. This is the Wi-Fi calibration (ART/EEPROM).
-This project never writes to it.
+## Build
+Upload the complete repository to GitHub. Open **Actions → Build ALAMEER K2 Firmware → Run workflow**. Leave the OpenWrt version blank to use `config.env`. Download the `ALAMEER-K2-firmware` artifact after all checks pass.
 
-## 2. Flash
-* **From an existing OpenWrt (same layout)**: LuCI → System → Backup / Flash Firmware → choose
-  `ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin` (uncheck *keep settings* the first time) or
-  `scp` it to `/tmp` and run `sysupgrade -n /tmp/ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin`.
-* **From stock firmware**: the first-install route for stock V22.5 is not covered or tested by this project.
-  Follow the OpenWrt Table of Hardware page for the Phicomm K2 (openwrt.org/toh/phicomm/k2). The image is a
-  standard OpenWrt sysupgrade image.
-Check the SHA256 (`ALAMEER-...bin.sha256`) before flashing. Do not power off during the write.
+The sysupgrade image is `ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin`. Verify its `.sha256` file before flashing.
 
-## 3. First boot
-Set your PC to `192.168.1.x` and browse to `http://192.168.1.20/`. Default state: AP mode, DHCP **off**, SSIDs
-open. Because DHCP is off, use a static IP on the PC or connect it behind your MikroTik. Set a root password
-(System → Administration) – the Wi-Fi is open by default.
+## Flashing
+From an existing OpenWrt installation using the same v22.5 layout, use LuCI → System → Backup / Flash Firmware, or `sysupgrade -n` with the image. First installation from stock firmware is not covered by this project; follow the Phicomm K2 OpenWrt device documentation and recovery instructions.
 
-## 4. Recovery
-* **Failsafe**: reboot and press the reset button (or type `f` when the console prompts) during early boot;
-  the router answers on 192.168.1.1 with SSH/telnet and no config. Run `firstboot && reboot` to wipe settings.
-* **Bad network config**: use Quick Setup → *Rollback*, or in failsafe `cp /etc/alameer/prev/network /etc/config/network`.
-* **Bricked**: serial console 57600 8N1 and OpenWrt's TFTP/bootloader recovery documented on the ToH page.
-  Having the `factory` backup lets you restore calibration.
+## First boot
+The configured LAN address is `192.168.1.20/24`; browse to `http://192.168.1.20/`. The default network mode is AP/bridge when the `br-lan` device and WAN VLAN device can be identified. DHCP on the LAN is disabled in that mode. Set a strong root password immediately. Wi-Fi is open by default to match the original specification; configure a password before exposing it to untrusted users.
+
+## Recovery
+If the address is unreachable, connect by Ethernet with a static address in `192.168.1.0/24`, inspect `/etc/alameer/first-boot.log`, and use the device's documented failsafe/serial/TFTP recovery process. Do not erase the factory/calibration partition.

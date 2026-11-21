@@ -1,16 +1,9 @@
-{#
-	Alameer Software LuCI theme – footer.
--#}
-
-			<div id="amfoot">
-				<div class="amcredit">
-					<b>Alameer Software</b>
-					<span>{{ _('Engineer') }}: AbduRaheem Al-Maakhathi (عبد الرحيم الماخذي)</span>
-					<span>WhatsApp: 776538297</span>
-				</div>
-				<div class="amlucitag">Powered by LuCI</div>
-			</div>
-		</div>
-		<script type="text/javascript">L.require('menu-alameer')</script>
-	</body>
+{# ALAMEER SOFTWARE - LuCI ucode theme footer. #}
+		<footer id="amfoot">
+			<span><b>ALAMEER SOFTWARE</b> · {{ _('Developed by Eng. Abdulrahim Al-Makhadhi') }}</span>
+			<span>Phicomm K2 V22.5 · {{ _('Powered by OpenWrt / LuCI') }}</span>
+		</footer>
+	</main>
+	<script>L.require('menu-alameer')</script>
+</body>
 </html>

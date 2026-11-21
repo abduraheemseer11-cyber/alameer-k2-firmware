@@ -6,13 +6,13 @@
 # ------------------------- edit these if needed -------------------------
 LAN_IP="192.168.1.20"
 LAN_MASK="255.255.255.0"
-HOSTNAME="Alameer-K2"
+HOSTNAME="Al-Makhadhi-K2"
 SSID_2G="AbduRaheem_2G"
 SSID_5G="AbduRaheem_5G"
-WIFI_KEY="12345678"        # WPA2 password; leave empty for an open network
-COUNTRY="BO"               # BO or US – observe your local regulations
-TX_2G="20"                 # dBm (hardware/regdb will clamp if lower)
-TX_5G="23"
+WIFI_KEY=""                # Empty = open network as requested; set a key for security
+COUNTRY="YE"               # Set by config.env; must match the country of operation
+TX_2G=""                   # Leave power selection to driver + regulatory database
+TX_5G=""
 SNMP_COMMUNITY="public"
 # -------------------------------------------------------------------------
 
@@ -22,13 +22,13 @@ mkdir -p /etc/alameer
 WAN_DEV="$(uci -q get network.wan.device)"
 [ -n "$WAN_DEV" ] || WAN_DEV="eth0.2"
 echo "$WAN_DEV" > /etc/alameer/wan_dev
-echo "router" > /etc/alameer/mode
+echo "ap" > /etc/alameer/mode
 
 # ---- system identity ----
 uci -q batch <<EOF
 set system.@system[0].hostname='$HOSTNAME'
 set system.@system[0].description='Alameer Software firmware'
-set system.@system[0].notes='AbduRaheem Al-Maakhathi - WhatsApp 776538297'
+set system.@system[0].notes='Developed by Eng. Abdulrahim Al-Makhadhi'
 commit system
 EOF
 
@@ -63,7 +63,7 @@ EOF
 # ---- LuCI theme ----
 uci -q get luci.themes >/dev/null || uci set luci.themes='internal'
 uci -q batch <<EOF
-set luci.themes.Alameer='/luci-static/alameer'
+set luci.themes.alameer='/luci-static/alameer'
 set luci.main.mediaurlbase='/luci-static/alameer'
 commit luci
 EOF
@@ -79,7 +79,8 @@ radio_band() {
 	b="$(uci -q get wireless.$1.band)"
 	case "$b" in 2g|5g|6g) echo "$b"; return;; esac
 	case "$(uci -q get wireless.$1.hwmode)" in 11g) echo 2g; return;; 11a) echo 5g; return;; esac
-	case "$(uci -q get wireless.$1.channel)" in [1-9]|1[0-4]) echo 2g;; *) echo 5g;; esac
+	case "$(uci -q get wireless.$1.channel)" in [1-9]|1[0-4]) echo 2g; return;; esac
+	case "$1" in radio0) echo 2g;; radio1) echo 5g;; *) echo unknown;; esac
 }
 
 # remove default (anonymous / default_radioN) AP sections and recreate ours
@@ -87,12 +88,12 @@ while uci -q delete wireless.@wifi-iface[0]; do :; done
 
 for r in $(uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
 	band="$(radio_band "$r")"
-	uci -q delete wireless.$r.disabled
+	uci set wireless.$r.disabled='0'
 	uci set wireless.$r.country="$COUNTRY"
 	uci set wireless.$r.channel='auto'
 	case "$band" in
-	2g) uci set wireless.$r.htmode='HT40'; uci set wireless.$r.txpower="$TX_2G"; SSID="$SSID_2G";;
-	5g) uci set wireless.$r.htmode='VHT80'; uci set wireless.$r.txpower="$TX_5G"; SSID="$SSID_5G";;
+	2g) uci set wireless.$r.htmode='HT20'; SSID="$SSID_2G";;
+	5g) uci set wireless.$r.htmode='VHT40'; SSID="$SSID_5G";;
 	*) continue;;
 	esac
 	s="ap_$band"
@@ -116,9 +117,9 @@ config mini_snmpd 'default'
 	option enabled '1'
 	option ipv6 '0'
 	option community '$SNMP_COMMUNITY'
-	option contact 'AbduRaheem Al-Maakhathi 776538297'
+	option contact 'Eng. Abdulrahim Al-Makhadhi'
 	option location 'Alameer Software'
-	option description 'Alameer-K2 (Phicomm K2 v22.5)'
+	option description 'Al-Makhadhi-K2 (Phicomm K2 v22.5)'
 	option interfaces 'br-lan'
 	option disks '/overlay'
 EOF

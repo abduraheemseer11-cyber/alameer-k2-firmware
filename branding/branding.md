@@ -1,4 +1,4 @@
-# ALAMEER SOFTWARE – Branding
+# ALAMEER SOFTWARE — Branding
 
 Developed by Eng. Abdulrahim Al-Makhadhi (المهندس عبد الرحيم الماخذي).
 
@@ -6,13 +6,11 @@ Developed by Eng. Abdulrahim Al-Makhadhi (المهندس عبد الرحيم ا�
 |---|---|
 | Deep Crimson | `#7A0D0D` |
 | Dark Red | `#8B0000` |
-| Background | `#F4F5F7` |
-| Cards | `#FFFFFF` |
-| Text | `#252525` |
-| Borders | `#C0C0C0` / light gray |
+| Charcoal | `#101116` |
+| Main background | `#111319` |
+| Panels | `#191C24` |
+| Silver | `#C4C8D0` |
 
-* `logo.png` – original logo (full size, for documentation).
-* Flash-optimised copies (`logo-160.png` 5 KB, `favicon.png` 3 KB) are generated from it and live in
-  `packages/luci-theme-alameer/files/www/luci-static/alameer/`. The full 113 KB logo is deliberately
-  **not** shipped inside the firmware (8 MB flash budget).
-* Footer: `ALAMEER SOFTWARE | Developed by Eng. Abdulrahim Al-Makhadhi`
+`branding/logo.png` is the full original mark. The firmware ships an optimized 128 px copy at `files/www/luci-static/alameer/logo.png` to preserve flash space.
+
+Footer credit: `ALAMEER SOFTWARE | Developed by Eng. Abdulrahim Al-Makhadhi`.

@@ -1,36 +1,28 @@
-# ALAMEER SOFTWARE K2 – V2 improvements
+# ALAMEER SOFTWARE K2 — refreshed project
 
-Base kept unchanged: OpenWrt **v22.03.7**, profile **phicomm_k2-v22.5**, flash layout and size limits
-(7552k partition, 7.4 MiB gate) are untouched.
+This revision consolidates the project on the OpenWrt 25.12.6 ImageBuilder path and removes the conflicting old Lua/22.03 build path.
 
-## 1. Default IP (192.168.1.20 / 255.255.255.0 / Al-Makhadhi-K2)
-Root cause found in V1: `alameer-apply` aborted (`die`) when no Wi-Fi radio was visible yet at first boot, **before**
-`uci commit`, so *all* staged changes (IP, bridge, hostname) were thrown away and OpenWrt's 192.168.1.1 stayed.
-Fixes:
-* Radio discovery is now non-fatal and runs **before** any change (atomic: nothing is modified if it fails).
-* First-boot script has a guaranteed fallback: reverts staged changes, forces `network.lan` to the IP/netmask from
-  `/etc/config/alameer`, sets the hostname, logs to `/etc/alameer/first-boot.log`.
-* The script lives in the ROM (`/etc/uci-defaults`), so a **factory reset re-applies** the defaults.
-* Persistent log `/etc/alameer/first-boot.log` records exactly what happened.
+## Interface
+- Rebuilt the theme as a ucode LuCI theme for OpenWrt 24.10/25.12.
+- Dark charcoal desktop shell, black top bar, fixed sidebar, crimson active state and silver details.
+- Uses the supplied ALAMEER logo.
+- Quick Setup is always the first, independent sidebar entry; Dashboard follows it.
+- Mobile layout uses a compact top bar, slide-in drawer, backdrop and stacked forms/tables.
 
-## 2. New LuCI UI (theme `luci-theme-alameer` v2)
-Fixed sidebar built from the real LuCI menu: **Quick Setup (NEW) · Dashboard · Network · Wireless · System · Status ·
-Security · System Logs**, logo on top, footer credit, SVG icons, card layout, crimson/silver/white palette, phone
-layout (burger menu), branded login page. Any LuCI page not in this list appears under *More* so nothing becomes
-unreachable. If the sidebar script fails, the stock menu stays visible. The theme *wraps* Bootstrap's templates
-(`include`) instead of copying them, so all JS views keep working.
-**Quick Setup is a stand-alone top-level page** (`admin/alameer`), not under Network.
-Not included: the Simple/Advanced toggle and dark mode seen in the reference screenshot.
+## Network defaults
+- LAN address: 192.168.1.20/24.
+- Hostname: Al-Makhadhi-K2.
+- Default AP setup adds the detected WAN VLAN device to br-lan and disables the LAN DHCP server, but only when both the bridge and WAN device are identified.
+- First boot no longer calls the absent legacy `alameer-apply` executable or creates stale `default_radio0/default_radio1` wireless sections.
 
-## 3. Wi-Fi 2.4 / 5 GHz
-* In LuCI's wireless overview the button next to a radio reads **"Disable" when the radio is currently enabled** and
-  "Enable" when it is off. So "Disable" alone is not proof that the radios are off – check `alameer-diag`.
-* Hardening of provisioning: radios are enabled (`disabled=0`), country set, TX power not forced; if the radios were
-  not probed at first boot a `wifi.pending` marker makes `alameer-boot` finish Wi-Fi setup at the next boot.
-* New read-only tool **`alameer-diag`** (also a button on the Dashboard) prints: LAN settings, `/proc/mtd`, loaded
-  wireless modules, PCI ids (MT7612E), phy list, wireless UCI, `wifi status`, `iwinfo`, kernel/system log lines.
-  Needed to identify a real driver/calibration problem; I did not change EEPROM/ART or force TX power.
+## Wireless
+- Explicitly includes `kmod-mt76x2` for the MT7612E 5 GHz radio.
+- Keeps detected radios enabled in UCI and avoids forcing TX power.
+- Uses the country configured in `config.env`; default is YE and must match the actual country of operation.
+- Radio availability still depends on the installed driver, factory calibration data and regulatory database. The Linux wireless-regdb entry for YE currently has no 5 GHz band rule, so this project does not spoof another country to force 5 GHz transmission.
 
-## 4. Tests / CI
-`scripts/check-project.sh` (defaults, Makefile references, theme, controller), `scripts/test-theme-menu.js`
-(sidebar model), plus the earlier script/permission checks, all run in GitHub Actions before the build.
+## Validation
+- Shell syntax checks passed.
+- LuCI JavaScript syntax checks passed.
+- Static project checks passed.
+- The OpenWrt ImageBuilder build and real-router runtime have not been executed in this editing environment.

@@ -40,7 +40,7 @@ return view.extend({
 
 		this.s = {
 			mode: (data[1] || '').trim() || 'router',
-			hostname: uci.get('system', '@system[0]', 'hostname') || 'Alameer-K2',
+			hostname: uci.get('system', '@system[0]', 'hostname') || 'Al-Makhadhi-K2',
 			ssid2g: 'AbduRaheem_2G', ssid5g: 'AbduRaheem_5G', wifi_key: '',
 			admin_pass: '', admin_pass2: '',
 			lan_proto: 'static', lan_ip: lanip, lan_mask: uci.get('network', 'lan', 'netmask') || '255.255.255.0', lan_gw: '', lan_dns: '',
@@ -109,9 +109,9 @@ return view.extend({
 			E('div', { 'style': 'display:flex;flex-wrap:wrap;gap:10px' }, MODES.map(function(m) {
 				var on = self.s.mode === m.id;
 				return E('div', {
-					'style': 'flex:1 1 220px;cursor:pointer;padding:12px;border-radius:10px;border:2px solid ' + (on ? '#7b2cbf' : '#e6dcef') + ';background:' + (on ? '#f4ecfa' : '#fff'),
+					'style': 'flex:1 1 220px;cursor:pointer;padding:12px;border-radius:10px;border:2px solid ' + (on ? '#b51f2b' : '#3b414e') + ';background:' + (on ? '#351a20' : '#202430'),
 					'click': function() { self.s.mode = m.id; self.draw(); }
-				}, [ E('b', { 'style': 'color:#3b0d54' }, m.title), E('div', { 'style': 'margin-top:4px' }, m.desc) ]);
+				}, [ E('b', { 'style': 'color:#f4f5f7' }, m.title), E('div', { 'style': 'margin-top:4px' }, m.desc) ]);
 			}))
 		]);
 	},

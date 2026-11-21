@@ -6,7 +6,7 @@ config core 'core'
 	option netmask '255.255.255.0'
 	option gateway ''
 	option dns ''
-	option country 'US'
+	option country 'YE'
 
 config wifi 'wifi_2g'
 	option ssid 'AbduRaheem_2G'

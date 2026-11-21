@@ -27,7 +27,7 @@ MESH_ID="$(j mesh_id)"; MESH_KEY="$(j mesh_key)"; MESH_RADIO="$(j mesh_radio)"; 
 
 # ------------------------------ validation ------------------------------
 case "$MODE" in ap|router|repeater|mesh) ;; *) die "Invalid mode";; esac
-[ -n "$HOST" ] || HOST="Alameer-K2"
+[ -n "$HOST" ] || HOST="Al-Makhadhi-K2"
 [ -n "$SSID2G" ] && [ ${#SSID2G} -le 32 ] || die "Invalid 2.4GHz SSID"
 [ -n "$SSID5G" ] && [ ${#SSID5G} -le 32 ] || die "Invalid 5GHz SSID"
 if [ -n "$WKEY" ]; then

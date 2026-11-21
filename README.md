@@ -1,105 +1,76 @@
-<<<<<<< HEAD
-# Alameer Software – Phicomm K2 v22.5 WISP firmware
+# ALAMEER SOFTWARE — Phicomm K2 V22.5
 
-Custom OpenWrt **25.12.6** image for the **Phicomm K2 v22.5** (`ramips/mt7620`, profile `phicomm_k2-v22.5`, 8 MB flash / 64 MB RAM), built with the official ImageBuilder and GitHub Actions.
+Custom OpenWrt **25.12.6** ImageBuilder project for **Phicomm K2 v22.5** (`ramips/mt7620`, profile `phicomm_k2-v22.5`). The project is designed for the 8 MB flash layout and refuses to package a sysupgrade image larger than **7,733,248 bytes** (7552 KiB).
+
+Developed by **Eng. Abdulrahim Al-Makhadhi**.
+
+## What this project builds
+
+- Official OpenWrt ImageBuilder image for `phicomm_k2-v22.5`.
+- ALAMEER ucode LuCI theme for OpenWrt 24.10/25.12, with dark desktop layout, fixed left sidebar, top bar, responsive mobile drawer, cards and crimson/silver branding.
+- Independent **Quick Setup** menu item at the top of the sidebar, separate from Network.
+- First-boot LAN management address `192.168.1.20/24` and hostname `Al-Makhadhi-K2`.
+- Default SSIDs `AbduRaheem_2G` and `AbduRaheem_5G`.
+- MT7612E driver package (`kmod-mt76x2`), wireless utilities, regulatory database and read-only `alameer-wifi-diag` report.
 
 ## Build with GitHub Actions
-1. Create a repo, push this folder to `main`.
-2. **Actions → Build Alameer K2 firmware → Run workflow** (a push to `main` also triggers it).
-3. Download the `alameer-k2-firmware` artifact (`*sysupgrade.bin`, manifest, `sha256sums.txt`). Tick *release* to publish a GitHub Release instead.
 
-The build fails automatically if the image is larger than the 7552k firmware partition.
+1. Create or open your GitHub repository and upload the complete project.
+2. Open **Actions → Build ALAMEER K2 Firmware → Run workflow**.
+3. Leave the OpenWrt version blank to use `25.12.6` from `config.env`.
+4. After a successful run, download `ALAMEER-K2-firmware` from Artifacts.
+5. The flashable file is `ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin`.
 
-## Build locally (Linux)
-```bash
-sudo apt install build-essential gawk wget zstd xz-utils file python3 rsync
-./scripts/build.sh            # or: ./scripts/build.sh 25.12.6
+The build checks the ImageBuilder checksum and enforces the 7552 KiB partition limit before creating the artifact. `build.log` is uploaded separately.
+
+## Build locally
+
+On Ubuntu/Debian with the ImageBuilder tools installed:
+
+```sh
+bash scripts/check-scripts.sh
+bash scripts/check-project.sh
+bash scripts/build.sh
 ```
-The equivalent raw ImageBuilder command (what `build.sh` runs):
-```bash
-make image PROFILE="phicomm_k2-v22.5" \
-  PACKAGES="$(grep -v '^\s*#' packages.txt | tr '\n' ' ')" \
-  FILES=/path/to/files EXTRA_IMAGE_NAME=alameer
+
+Optionally pass another official OpenWrt release version:
+
+```sh
+bash scripts/build.sh 25.12.6
 ```
 
-## Layout
-| Path | Purpose |
-|---|---|
-| `config.env`, `packages.txt` | version / profile and the package list (`-pkg` = removed) |
-| `scripts/build.sh`, `.github/workflows/build.yml` | build + size check |
-| `files/etc/uci-defaults/99-alameer-config` | first-boot defaults (IP, SSIDs, radios, SNMP, theme) |
-| `files/usr/share/ucode/luci/template/themes/alameer/` | `header.ut` / `footer.ut` |
-| `files/www/luci-static/alameer/` | `cascade.css`, `logo.svg` |
-| `files/www/luci-static/resources/menu-alameer.js` | sidebar / tab menu |
-| `files/www/luci-static/resources/view/alameer/quicksetup.js` | Quick Setup wizard (4 modes) |
-| `files/usr/libexec/alameer/quicksetup-apply` | writes UCI + reloads services |
-| `files/usr/share/luci/menu.d`, `.../rpcd/acl.d` | menu entry `admin/quicksetup` and permissions |
+The output files are placed in `output/`.
 
-## Defaults
-LAN `192.168.1.20/24`, hostname `Alameer-K2`, SSIDs `AbduRaheem_2G` (HT40) / `AbduRaheem_5G` (VHT80), country `BO`, TX power 20 / 23 dBm, channel auto, **Wi-Fi password `12345678`** (change it, or set `WIFI_KEY=""` in the script for open Wi-Fi), SNMP v2c community `public` on UDP 161 (also allowed from the uplink/WAN zone – remove the `Allow-SNMP-WAN` rule if you don't want that). All editable at the top of `99-alameer-config`.
+## LuCI layout
 
-## Differences from the original brief (OpenWrt 25.12 reality)
-- **LuCI is JavaScript + ucode in 25.12; Lua controllers/CBI no longer exist.** The wizard is therefore a JS view + `menu.d` JSON + rpcd ACL (still served at `/cgi-bin/luci/admin/quicksetup`), and the theme uses `header.ut` / `footer.ut` instead of `header.htm` / `footer.htm`.
-- 25.12 uses **apk**, not opkg. `wpad-mesh-mbedtls` is used (smaller than wolfssl); swap to `wpad-mesh-wolfssl` in `packages.txt` if it is not available.
-- The mt7620 switch uses **swconfig**, not DSA. The management VLAN adds a tagged `eth0.<id>` interface and never removes the untagged LAN.
-- The Wi-Fi radios are detected by band (`2g`/`5g`), not by the `radio0`/`radio1` name, because the numbering can differ.
-- The theme imports the bootstrap theme's CSS for the widgets (dropdowns, modals), so `luci-theme-bootstrap` stays in the image (also a safe fallback).
+Desktop:
+- Black top bar with ALAMEER logo and router identity.
+- Fixed dark sidebar with Quick Setup first, then Dashboard, Wi-Fi, Network, System and Status entries discovered from LuCI's real menu tree.
+- Dark content canvas and consistent panels, buttons, tables and forms.
 
-## Status
-Shell, JSON, SVG, YAML, JS syntax were checked. **Not tested on a real K2 or in a real ImageBuilder run** – do a first build and flash on a spare unit, and keep serial/TFTP recovery in mind.
-=======
-<p align="center"><img src="branding/logo.png" width="180" alt="ALAMEER SOFTWARE"></p>
+Mobile:
+- Compact top bar with a hamburger button.
+- Slide-in navigation drawer with a dimmed backdrop and Escape-to-close support.
+- Single-column forms and stacked table rows for narrow screens.
 
-# ALAMEER SOFTWARE – Professional Router Firmware (Phicomm K2 PSG1218, v22.5 layout)
+The theme is built for the ucode LuCI runtime used by OpenWrt 24.10 and 25.12. It is not the old Lua `.htm` theme package.
 
-Developed by **Eng. Abdulrahim Al-Makhadhi** – المهندس عبد الرحيم الماخذي
+## Wi-Fi regulatory note — important
 
-OpenWrt-based firmware project for MT7620A + MT7612E, 64 MB RAM, 8 MB flash. Source project only:
-**the firmware BIN is built by GitHub Actions**; nothing in this repository is a prebuilt binary.
+The build defaults to `WIFI_COUNTRY=YE` in `config.env` because the regulatory domain must match the country where the router is used. The current Linux `wireless-regdb` entry for Yemen (`YE`) lists 2.4 GHz operation but no 5 GHz allocation. Therefore, **the project cannot lawfully force a 5 GHz access point to transmit in Yemen by changing the country code to US or another country**. The 5 GHz radio/driver can be present while the regulatory rules prevent AP operation. See the Linux wireless regulatory database documentation and the `country YE` entry.
 
-## V2 (2.0.0)
-See `docs/CHANGES-V2.md`: default-IP root-cause fix, new sidebar UI with Quick Setup as a top-level item, Wi-Fi provisioning hardening and `alameer-diag`.
+If the router will actually be operated in another country, change `WIFI_COUNTRY` in `config.env` to that country's valid ISO alpha-2 code only after confirming that the relevant 2.4/5 GHz channels are permitted there. The driver and regulatory database still determine the real allowed channels and power. No 30 dBm override is applied.
 
-## Status – read this first
-* V2 changes were **not built or flashed by the author** (no build environment); the V1 base reportedly built on Actions. Expect to fix small issues on the first Actions run. Gates (`verify-device.sh`,
-  `verify-image-size.sh`) make sure a bad image is never published as flashable.
-* Pinned to OpenWrt **v22.03.7** (not 21.02.7): the `phicomm_k2-v22.5` profile does not exist in 21.02 – see
-  `docs/HARDWARE.md`. You can try another tag through the workflow input; the device gate decides.
-* LuCI theme/app are written for **Lua LuCI (21.02/22.03)**.
+`kmod-mt76x2` is explicitly selected for the MT7612E 5 GHz chipset. The 2.4 GHz radio is provided by the MT7620 device support in the target image. If either radio still fails to start, run `alameer-wifi-diag` and share its output; it collects `iw phy`, `iw reg get`, `wifi status`, `dmesg | grep -Ei 'mt76|mt7620|firmware|eeprom|wlan'`, and `/etc/config/wireless`; do not erase or overwrite the factory calibration partition.
 
-## What is inside
-| Path | Purpose |
-|---|---|
-| `.github/workflows/build-firmware.yml` | CI: deps → selftest → build → verify → package → artifacts / release |
-| `scripts/build.sh` | Clone pinned OpenWrt, verify device, feeds, apply project, `make` |
-| `scripts/verify-device.sh` | Checks profile, 7552k size, DTS flash layout, read-only `factory`, MT7612E driver |
-| `scripts/verify-image-size.sh` | Size ≤ min(7.4 MiB, partition), uImage magic, device string in metadata |
-| `scripts/package-release.sh` | Produces `ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin` + sha256 + manifest |
-| `scripts/selftest.sh` | Tests the gates against a synthetic tree |
-| `scripts/check-scripts.sh`, `check-project.sh`, `test-theme-menu.js` | Script robustness, project consistency, sidebar unit test |
-| `scripts/fix-permissions.sh` | Restore exec bits and record them in Git |
-| `configs/base.config` | Size-optimised config (no IPv6/PPP/USB, squashfs block 1024, wpad-basic-wolfssl) |
-| `files/` | Rootfs overlay: banner, `/etc/config/alameer`, first-boot provisioning |
-| `packages/luci-theme-alameer` | Deep-crimson theme (CSS layer over Bootstrap templates), logo, favicon, footer |
-| `packages/luci-app-alameer` | Dashboard, Quick Setup (AP / Repeater+WISP / Router), `alameer-apply` |
-| `packages/alameer-watchdog` | Rate-limited network/Wi-Fi/memory watchdog (reboot off by default) |
-| `docs/` | Installation, network modes, hardware, troubleshooting |
+## Default settings and security
 
-## Quick start
-1. Create a GitHub repo and push this folder (see below).
-2. Actions → **Build ALAMEER K2 Firmware** → *Run workflow* (≈1–2 h).
-3. Download artifact **ALAMEER-K2-firmware** → `ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin`.
-4. Read `docs/INSTALLATION.md`, then flash.
+- LAN: `192.168.1.20`, netmask `255.255.255.0`.
+- Hostname: `Al-Makhadhi-K2`.
+- SSIDs: `AbduRaheem_2G` and `AbduRaheem_5G`.
+- Wi-Fi is configured open by default to match the original specification. Set a strong Wi-Fi key in Quick Setup before exposing the network to users.
+- Set a strong root password immediately after first boot.
 
-```bash
-git init && git add . && git commit -m "ALAMEER K2 firmware project"
-git branch -M main
-git remote add origin https://github.com/<you>/ALAMEER-SOFTWARE-K2.git
-git push -u origin main
-```
-Pushing a tag `v22.5.0` also builds and creates a GitHub Release.
+## Hardware safety
 
-## Defaults
-Hostname `Al-Makhadhi-K2`, LAN `192.168.1.20/24`, AP/bridge mode, DHCP and NAT off, SSIDs `AbduRaheem_2G`
-and `AbduRaheem_5G` **open**, country `US` (adjust to your location), TX power not forced.
->>>>>>> d777d6c1c18170daf611fdd513ab792332509ebb
+This project targets **Phicomm K2 V22.5 or newer using the v22.5 flash layout only**. Do not flash this image on V22.4 or an unverified board revision. Keep a backup of the factory/calibration partition. The project has not been tested on the user's physical router in this development environment; a successful CI build is not a substitute for first-boot hardware testing.

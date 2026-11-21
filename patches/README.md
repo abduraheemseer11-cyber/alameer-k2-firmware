@@ -1,6 +1,3 @@
-# patches/
+# Optional source patches
 
-Optional `*.patch` files placed here are applied (in alphabetical order, `git apply`) to the pinned OpenWrt
-source by `scripts/build.sh`. This release needs **no source patches**: it uses the upstream
-`phicomm_k2-v22.5` profile unmodified. `scripts/verify-device.sh` refuses to build if a patch mentions
-factory / EEPROM / ART.
+Place reviewed OpenWrt source patches here only when a hardware-specific upstream fix is required. The current build uses the official ImageBuilder and the upstream `phicomm_k2-v22.5` profile without changing device DTS, flash partitions, factory data or calibration. Do not add patches that modify the factory/EEPROM/ART regions.

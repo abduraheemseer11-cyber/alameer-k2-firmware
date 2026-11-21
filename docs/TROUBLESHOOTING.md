@@ -1,14 +1,23 @@
 # Troubleshooting
 
-| Problem | What to do |
+| Symptom | Checks |
 |---|---|
-| Build fails with "device profile ... does not exist" | The pinned OpenWrt tag is too old (21.02.x lacks `phicomm_k2-v22.5`). Use `v22.03.7` or newer. |
-| "IMAGE SIZE ... over the limit" | Remove packages in `configs/base.config` (e.g. `luci-app-firewall` is already off; drop `lldpd`/`relayd` if necessary). No BIN is produced. |
-| Theme looks like plain Bootstrap | The theme relies on Lua LuCI templates (21.02/22.03). On 23.05+ (ucode) it needs porting. Check `uci get luci.main.mediaurlbase`. |
-| Lost access after Apply | Wait ~40 s; connect to the new LAN IP; or Rollback; or failsafe (INSTALLATION.md §4). |
-| Only one radio shows | `logread | grep -i mt76`, `wifi status`; the 5 GHz radio needs `kmod-mt76x2`. Do not touch the `factory` partition. |
-| CDP not visible on MikroTik | `lldpcli show configuration`; if CDP is unavailable the lldpd build lacks it (LLDP still works). Verify with `lldpcli show neighbors`. |
-| Watchdog log | `/tmp/alameer-watchdog.log`, `logread -e alameer-watchdog`. Config: `uci show alameer.watchdog`. |
-| PPPoE needed | `opkg update && opkg install ppp ppp-mod-pppoe` then re-run Quick Setup (router mode). |
-| Wi-Fi radios not working / IP is 192.168.1.1 | SSH in and run `alameer-diag` (or Dashboard → *Run Wi-Fi / IP diagnostics*); read `/etc/alameer/first-boot.log`. Note: LuCI's "Disable" button means the radio is currently **enabled**. |
-| Sidebar missing | The stock menu is shown if `alameer.js` fails; check the browser console. The theme needs Lua LuCI (21.02/22.03). |
+| LuCI shows the old theme | Confirm `uci get luci.main.mediaurlbase` returns `/luci-static/alameer`; clear the browser cache and reload. |
+| Sidebar does not appear | Check browser console and `logread`; confirm `menu-alameer.js` and the ucode theme templates are present. |
+| LAN is not reachable at 192.168.1.20 | Check `/etc/alameer/first-boot.log`, `uci show network.lan`, and the static IP on the PC. |
+| 2.4 GHz radio is missing | Run `wifi status`, `iw phy`, and `dmesg | grep -Ei 'mt7620|rt2x00|eeprom|firmware'`. |
+| 5 GHz radio is missing | Check `opkg`/`apk` package list for `kmod-mt76x2`, `iw phy`, `iw reg get`, `dmesg | grep -Ei 'mt76|mt7612|eeprom|firmware'`, and factory calibration. In Yemen, the current Linux wireless-regdb does not define a 5 GHz rule for YE. |
+| Wi-Fi appears disabled | In LuCI, inspect the radio state and the interface state separately. `option disabled '0'` in UCI does not override missing driver, calibration or regulatory channels. |
+| Build exceeds flash limit | Remove optional packages from `packages.txt`; do not change the device profile or partition limit. |
+| Firmware does not boot | Confirm v22.5 hardware layout and restore using the documented serial/TFTP recovery method. Preserve the factory partition. |
+
+Run `alameer-wifi-diag` to collect the read-only wireless report. Useful individual commands:
+
+```sh
+cat /etc/config/wireless
+wifi status
+iw phy
+iw reg get
+logread | grep -Ei 'hostapd|netifd|mt76|wireless'
+dmesg | grep -Ei 'mt76|mt7620|eeprom|firmware|wlan'
+```

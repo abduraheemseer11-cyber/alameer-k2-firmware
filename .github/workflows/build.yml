@@ -1,15 +1,16 @@
-name: Build Alameer K2 firmware
+name: Build ALAMEER K2 Firmware
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "OpenWrt version (blank = config.env)"
+      openwrt_version:
+        description: "OpenWrt release (blank uses config.env)"
         required: false
         default: ""
-      release:
-        description: "Publish a GitHub Release with the images"
+      publish_release:
+        description: "Create a GitHub Release after a successful verified build"
         type: boolean
+        required: false
         default: false
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "packages.txt"
       - "config.env"
       - ".github/workflows/build.yml"
+      - "README.md"
 
 permissions:
   contents: write
@@ -26,43 +28,67 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout project
+        uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install ImageBuilder tools
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential gawk wget zstd xz-utils file python3 rsync unzip libncurses-dev
+            build-essential gawk wget zstd xz-utils file python3 rsync unzip ca-certificates \
+            libncurses-dev
 
-      - name: Syntax check scripts
+      - name: Prepare scripts and validate project
+        shell: bash
         run: |
-          sh -n files/etc/uci-defaults/99-alameer-config
-          sh -n files/usr/libexec/alameer/quicksetup-apply
-          bash -n scripts/build.sh
+          set -euo pipefail
+          chmod 0755 scripts/*.sh files/etc/uci-defaults/* files/usr/libexec/alameer/* files/usr/sbin/alameer-wifi-diag
+          bash scripts/check-scripts.sh
+          bash scripts/check-project.sh
 
-      - name: Build
-        run: ./scripts/build.sh "${{ github.event.inputs.version }}"
+      - name: Build and size-check firmware
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.openwrt_version }}"
+          if [ -n "$VERSION" ]; then
+            bash scripts/build.sh "$VERSION" 2>&1 | tee build.log
+          else
+            bash scripts/build.sh 2>&1 | tee build.log
+          fi
 
-      - name: Show size report
-        run: ls -l output/
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: alameer-k2-firmware
-          path: output/*
+          name: ALAMEER-K2-firmware
+          path: |
+            output/ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin
+            output/ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin.sha256
+            output/VERSION.txt
+            output/config.buildinfo
+            output/*.manifest
           if-no-files-found: error
+          retention-days: 30
 
-      - name: Read version
-        id: ver
-        run: |
-          . ./config.env
-          echo "v=${{ github.event.inputs.version }}" | sed 's/=$/='"$OPENWRT_VERSION"'/' >> "$GITHUB_OUTPUT"
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALAMEER-K2-build-logs
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 14
 
-      - name: Release
-        if: ${{ github.event.inputs.release == 'true' }}
+      - name: Publish GitHub Release
+        if: success() && github.event_name == 'workflow_dispatch' && inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: alameer-k2-${{ steps.ver.outputs.v }}-${{ github.run_number }}
-          name: Alameer K2 (OpenWrt ${{ steps.ver.outputs.v }}) #${{ github.run_number }}
-          files: output/*
+          tag_name: alameer-k2-${{ github.run_number }}
+          name: ALAMEER K2 Firmware #${{ github.run_number }}
+          files: |
+            output/ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin
+            output/ALAMEER-K2-mt7620-phicomm_k2-v22.5-sysupgrade.bin.sha256
+            output/VERSION.txt

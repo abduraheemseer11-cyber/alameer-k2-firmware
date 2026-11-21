@@ -1,0 +1,30 @@
+#!/bin/sh
+# Read-only ALAMEER wireless diagnostics. Safe to run and share with support.
+echo '=== ALAMEER Wi-Fi diagnostics ==='
+echo "Date: $(date)"
+echo "Board: $(ubus call system board 2>/dev/null)"
+echo '
+--- UCI wireless ---'
+uci show wireless 2>/dev/null || true
+echo '
+--- regulatory domain ---'
+iw reg get 2>/dev/null || true
+echo '
+--- physical radios ---'
+iw phy 2>/dev/null || true
+echo '
+--- wifi status ---'
+wifi status 2>/dev/null || true
+echo '
+--- iwinfo ---'
+iwinfo 2>/dev/null || true
+echo '
+--- modules ---'
+lsmod 2>/dev/null | grep -Ei 'mt76|mt7620|rt2|mac80211|cfg80211' || true
+echo '
+--- kernel messages ---'
+dmesg 2>/dev/null | grep -Ei 'mt76|mt7620|rt2|eeprom|firmware|wlan|wireless|regulatory' | tail -n 120 || true
+echo '
+--- factory partition (read-only metadata only) ---'
+grep -iE 'factory|permanent_config|firmware' /proc/mtd 2>/dev/null || true
+echo '=== End diagnostics ==='

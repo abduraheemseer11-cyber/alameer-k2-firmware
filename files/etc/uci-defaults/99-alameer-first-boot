@@ -1,80 +1,50 @@
 #!/bin/sh
-# ALAMEER SOFTWARE - first boot provisioning (runs once per fresh/reset flash, then self-deletes).
-# Lives in the ROM, so a factory reset runs it again. Order of safety:
-#   1. alameer-apply does everything atomically (nothing is changed if validation fails)
-#   2. if it fails anyway, a minimal fallback still forces the required LAN IP + hostname
-#   3. if Wi-Fi radios are not probed yet, alameer-boot finishes Wi-Fi at boot
+# ALAMEER SOFTWARE - safe first-boot finalization for the ImageBuilder overlay.
+# The actual radio names are discovered by 99-alameer-config; never create stale
+# default_radio0/default_radio1 sections which may not match this device profile.
 LOG=/etc/alameer/first-boot.log
 mkdir -p /etc/alameer
-{ echo "first boot $(date '+%F %T')"; } > "$LOG"
+{
+  echo "ALAMEER first boot: $(date '+%F %T')"
+  LAN_IP="$(uci -q get network.lan.ipaddr)"
+  if [ "$LAN_IP" != '192.168.1.20' ]; then
+    echo "Fixing LAN IP from ${LAN_IP:-unset} to 192.168.1.20"
+    uci set network.lan.proto='static'
+    uci set network.lan.ipaddr='192.168.1.20'
+    uci set network.lan.netmask='255.255.255.0'
+    uci commit network
+  fi
+  uci set system.@system[0].hostname='Al-Makhadhi-K2'
+  uci commit system
 
-IP="$(uci -q get alameer.core.lan_ip)";    IP="${IP:-192.168.1.20}"
-MASK="$(uci -q get alameer.core.netmask)"; MASK="${MASK:-255.255.255.0}"
-HN="$(uci -q get alameer.core.hostname)";  HN="${HN:-Al-Makhadhi-K2}"
+  # Default AP/bridge mode: merge the WAN VLAN device into br-lan and stop
+  # the router from handing out addresses. Do not guess if the bridge is absent.
+  WAN_DEV="$(cat /etc/alameer/wan_dev 2>/dev/null)"
+  BRSEC=""
+  for sec in $(uci show network 2>/dev/null | sed -n 's/^network\.\([^.=]*\)=device$/\1/p'); do
+    if [ "$(uci -q get network.${sec}.name)" = 'br-lan' ]; then BRSEC="$sec"; break; fi
+  done
+  if [ -n "$BRSEC" ] && [ -n "$WAN_DEV" ]; then
+    uci -q del_list "network.${BRSEC}.ports=${WAN_DEV}"
+    uci add_list "network.${BRSEC}.ports=${WAN_DEV}"
+    uci -q delete network.wan
+    uci -q delete network.wan6
+    uci set dhcp.lan.ignore='1'
+    uci commit network
+    uci commit dhcp
+    echo "AP bridge: added $WAN_DEV to br-lan; LAN DHCP disabled"
+  else
+    echo "AP bridge not changed: br-lan or WAN device not detected; keeping stock switch config"
+  fi
 
-uci -q batch <<UCI
-set luci.main.mediaurlbase='/luci-static/alameer'
-set luci.themes.ALAMEER='/luci-static/alameer'
-commit luci
-UCI
-
-if /usr/sbin/alameer-apply ap --first-boot >>"$LOG" 2>&1; then
-	echo "alameer-apply: OK" >> "$LOG"
-else
-	echo "alameer-apply: FAILED - reverting staged changes and using minimal fallback" >> "$LOG"
-	uci -q revert network; uci -q revert wireless; uci -q revert dhcp; uci -q revert firewall
-fi
-
-# ==========================================
-# FORCE CUSTOM WIFI SETTINGS (AbduRaheem)
-# ==========================================
-echo "Applying custom WiFi settings..." >> "$LOG"
-
-# 2.4 GHz Radio
-uci set wireless.radio0.disabled='0'
-uci set wireless.default_radio0.ssid='AbduRaheem_2G'
-uci set wireless.default_radio0.encryption='none'
-uci -q delete wireless.default_radio0.key
-
-# 5 GHz Radio
-uci set wireless.radio1.disabled='0'
-uci set wireless.default_radio1.ssid='AbduRaheem_5G'
-uci set wireless.default_radio1.encryption='none'
-uci -q delete wireless.default_radio1.key
-
-uci commit wireless
-wifi reload
-# ==========================================
-
-# Guarantee the management address and hostname whatever happened above
-if [ "$(uci -q get network.lan.ipaddr)" != "$IP" ] || [ "$(uci -q get network.lan.netmask)" != "$MASK" ]; then
-	echo "fallback: forcing network.lan to $IP/$MASK" >> "$LOG"
-	uci set network.lan.proto='static'
-	uci set network.lan.ipaddr="$IP"
-	uci set network.lan.netmask="$MASK"
-	uci -q delete network.lan.ip6assign
-	uci commit network
-	uci set dhcp.lan.ignore='1'; uci commit dhcp
-fi
-uci set system.@system[0].hostname="$HN"; uci commit system
-echo "final: lan=$(uci -q get network.lan.ipaddr)/$(uci -q get network.lan.netmask) hostname=$(uci -q get system.@system[0].hostname)" >> "$LOG"
-
-/etc/init.d/alameer-boot enable 2>/dev/null
-
-# lldpd: advertise hostname, CDP on, listen on the LAN bridge
-if [ -x /usr/sbin/lldpd ]; then
-	uci -q delete lldpd.config
-	uci -q batch <<UCI
-set lldpd.config=lldpd
-set lldpd.config.enable_cdp='1'
-set lldpd.config.enable_fdp='0'
-set lldpd.config.enable_sonmp='0'
-set lldpd.config.enable_edp='0'
-set lldpd.config.lldp_class='10'
-set lldpd.config.lldp_hostname='$HN'
-set lldpd.config.lldp_description='ALAMEER SOFTWARE Phicomm K2 firmware'
-set lldpd.config.interface='br-lan'
-commit lldpd
-UCI
-fi
+  # Keep detected radio devices enabled; the regulatory database remains the
+  # authority for which channels may actually transmit in the selected country.
+  for radio in $(uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+    uci set "wireless.${radio}.disabled=0"
+  done
+  uci commit wireless
+  echo "LAN: $(uci -q get network.lan.ipaddr)"
+  echo "Country: $(uci -q get wireless.radio0.country 2>/dev/null || echo unset)"
+  echo 'First-boot defaults finalized.'
+} >> "$LOG" 2>&1
 exit 0
