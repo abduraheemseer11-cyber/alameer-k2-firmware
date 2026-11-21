@@ -1,0 +1,17 @@
+#!/bin/sh
+# Remove HTTPS and bind the only web listener to IPv4 TCP/80.
+uci -q delete uhttpd.main.listen_https
+uci -q delete uhttpd.main.redirect_https
+uci -q delete uhttpd.main.cert
+uci -q delete uhttpd.main.key
+uci -q delete uhttpd.main.lua_prefix
+uci -q set uhttpd.main.home='/www'
+uci -q set uhttpd.main.ubus_prefix='/ubus'
+uci -q set uhttpd.main.ubus_cors='0'
+uci -q delete uhttpd.main.listen_http
+uci -q add_list uhttpd.main.listen_http='0.0.0.0:80'
+uci -q commit uhttpd
+for svc in dropbear dnsmasq odhcpd firewall; do
+  [ -x "/etc/init.d/$svc" ] && { "/etc/init.d/$svc" stop 2>/dev/null; "/etc/init.d/$svc" disable 2>/dev/null; }
+done
+exit 0

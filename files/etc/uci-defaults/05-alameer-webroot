@@ -1,0 +1,6 @@
+#!/bin/sh
+# Serve the standalone ALAMEER dashboard at the router root.
+cat > /www/index.html <<'EOF'
+<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/alameer/"><title>ALAMEER</title></head><body><a href="/alameer/">Open ALAMEER Dashboard</a></body></html>
+EOF
+exit 0
