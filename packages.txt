@@ -1,0 +1,57 @@
+# OpenWrt 23.05.3 ImageBuilder packages for Phicomm K2 v22.5
+# Remove LuCI completely: ALAMEER is an independent web application.
+-luci
+-luci-base
+-luci-mod-admin-full
+-luci-theme-bootstrap
+-luci-theme-argon
+-rpcd-mod-luci
+-dropbear
+-dnsmasq
+-dnsmasq-full
+-odhcpd
+-odhcpd-ipv6only
+-odhcp6c
+-unbound
+-firewall
+-firewall4
+-nftables
+-iptables
+-ppp
+-ppp-mod-pppoe
+-uhttpd-mod-tls
+-luci-ssl
+-luci-ssl-openssl
+-libustream-mbedtls
+-libustream-openssl
+-libustream-wolfssl
+-uclient-fetch
+-kmod-ipv6
+-luci-proto-ipv6
+-kmod-usb-core
+-kmod-usb2
+-kmod-usb-ohci
+-kmod-usb-ehci
+
+# Minimal HTTP + JSON-RPC backend for the custom dashboard
+uhttpd
+uhttpd-mod-ubus
+rpcd
+rpcd-mod-iwinfo
+rpcd-mod-file
+rpcd-mod-rpcsys
+iwinfo
+
+# K2 dual-band wireless drivers and WPA2 support
+kmod-rt2800-soc
+kmod-mt76x2
+wpad-basic-mbedtls
+
+# AP / bridge / neighbor discovery utilities
+lldpd
+relayd
+bridge
+
+# Timezone and scheduled tasks
+zoneinfo-asia
+cron
