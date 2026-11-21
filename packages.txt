@@ -1,34 +1,7 @@
-# Official OpenWrt ImageBuilder package additions/removals for Phicomm K2 v22.5.
-# The device profile itself also declares kmod-mt76x2; listing it explicitly makes
-# the intended 5 GHz driver dependency auditable in the project.
--odhcp6c
--odhcpd-ipv6only
--ip6tables
--wpad-basic-mbedtls
--libustream-mbedtls
-
-uhttpd
-uhttpd-mod-ubus
-luci-base
-luci-mod-network
-luci-mod-status
-luci-mod-system
-luci-app-firewall
-luci-proto-ppp
-luci-proto-relay
-luci-theme-bootstrap
-
-# Wireless drivers / regulatory database / control utilities
-kmod-mt76x2
-wpad-mesh-mbedtls
-wireless-regdb
-iw
-iwinfo
-
-# Network modes and discovery
-swconfig
-relayd
-lldpd
-mini_snmpd
-ppp
-ppp-mod-pppoe
+# One package per line. Prefix with "-" to remove a default package.
+# NOTE: ImageBuilder has no .config file; packages are passed to `make image PACKAGES=...`.
+luci
+luci-i18n-base-ar
+wpad-basic-mbedtls
+kmod-mt7603
+kmod-mt76x0e

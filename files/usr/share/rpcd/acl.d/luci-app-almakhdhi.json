@@ -1,0 +1,21 @@
+{
+	"luci-app-almakhdhi": {
+		"description": "AlMakhdhi SoftWare: Dashboard, Quick Setup and header tools",
+		"read": {
+			"uci": [ "network", "wireless", "luci" ],
+			"ubus": {
+				"system": [ "board", "info" ],
+				"network.interface": [ "dump" ],
+				"network.wireless": [ "status" ],
+				"iwinfo": [ "info", "assoclist" ]
+			},
+			"file": {
+				"/sys/class/thermal/thermal_zone0/temp": [ "read" ],
+				"/bin/ping": [ "exec" ]
+			}
+		},
+		"write": {
+			"uci": [ "network", "wireless", "luci" ]
+		}
+	}
+}

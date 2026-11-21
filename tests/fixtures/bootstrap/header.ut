@@ -1,0 +1,18 @@
+{%
+	const boardinfo = ubus.call('system', 'board');
+	http.prepare_content('text/html; charset=UTF-8');
+-%}
+<!DOCTYPE html>
+<html lang="{{ dispatcher.lang }}">
+	<head>
+		<meta charset="utf-8">
+		<meta name="theme-color" content="#ffffff">
+		<title>{{ boardinfo.hostname }} - LuCI</title>
+		<link rel="stylesheet" href="{{ media }}/cascade.css">
+		<link rel="icon" href="{{ media }}/favicon.svg">
+		<script src="{{ dispatcher.build_url('admin/translations', dispatcher.lang) }}?v={{ version.luciversion }}"></script>
+		<script src="{{ resource }}/cbi.js?v={{ version.luciversion }}"></script>
+	</head>
+	<body>
+		<header><div class="fill"><div class="container"><span class="showSide"></span><a class="brand" href="#">{{ boardinfo.hostname }}</a><div class="pull-right"><div id="indicators"></div></div></div></div></header>
+		<div class="main"><div class="main-left" id="mainmenu"></div><div class="main-right"><div id="maincontent" class="container">

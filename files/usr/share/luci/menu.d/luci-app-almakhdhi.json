@@ -1,0 +1,25 @@
+{
+	"admin/dashboard": {
+		"title": "Dashboard",
+		"order": 1,
+		"action": {
+			"type": "view",
+			"path": "almakhdhi/dashboard"
+		},
+		"depends": {
+			"acl": [ "luci-app-almakhdhi" ]
+		}
+	},
+	"admin/quicksetup": {
+		"title": "Quick Setup",
+		"order": 2,
+		"action": {
+			"type": "view",
+			"path": "almakhdhi/quicksetup"
+		},
+		"depends": {
+			"acl": [ "luci-app-almakhdhi" ],
+			"uci": { "network": true }
+		}
+	}
+}

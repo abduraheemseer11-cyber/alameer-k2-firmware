@@ -1,0 +1,113 @@
+#!/bin/sh
+# Applied once on first boot, then deleted automatically by OpenWrt (exit 0 required).
+
+### ---- Edit these values if needed --------------------------------------
+HOSTNAME="AbduRaheem"
+LAN_IP="192.168.1.20"
+LAN_MASK="255.255.255.0"
+SSID_2G="AbduRaheem_2G"
+SSID_5G="ABDURAHEEM_5G"
+TXPOWER="20"        # dBm; the driver still caps it to what hardware/regdomain allows
+COUNTRY=""          # e.g. "DE"; empty = leave regulatory domain untouched
+WIFI_KEY=""         # empty = OPEN networks (like stock OpenWrt). 8+ chars = WPA2-PSK
+GATEWAY=""          # optional, e.g. 192.168.1.1 (useful for internet/updates on the router itself)
+DNS=""              # optional, space separated, e.g. "192.168.1.1"
+### -----------------------------------------------------------------------
+
+# ---- Hostname ----
+uci -q set system.@system[0].hostname="$HOSTNAME"
+
+# ---- LAN: static IP ----
+uci -q set network.lan.proto='static'
+uci -q set network.lan.ipaddr="$LAN_IP"
+uci -q set network.lan.netmask="$LAN_MASK"
+[ -n "$GATEWAY" ] && uci -q set network.lan.gateway="$GATEWAY"
+if [ -n "$DNS" ]; then
+	uci -q delete network.lan.dns
+	for d in $DNS; do uci -q add_list network.lan.dns="$d"; done
+fi
+
+# ---- No IPv6 prefix delegation / ULA on LAN ----
+uci -q delete network.lan.ip6assign
+uci -q delete network.globals.ula_prefix
+
+# ---- DHCP (v4) off; DHCPv6 / RA / NDP off ----
+uci -q set dhcp.lan=dhcp
+uci -q set dhcp.lan.interface='lan'
+uci -q set dhcp.lan.ignore='1'
+uci -q delete dhcp.lan.start
+uci -q delete dhcp.lan.limit
+uci -q delete dhcp.lan.leasetime
+uci -q set dhcp.lan.dhcpv6='disabled'
+uci -q set dhcp.lan.ra='disabled'
+uci -q set dhcp.lan.ndp='disabled'
+uci -q delete dhcp.lan.ra_slaac
+uci -q delete dhcp.lan.ra_flags
+
+# ---- Wi-Fi ----
+list_radios() {
+	uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'
+}
+
+RADIOS="$(list_radios)"
+if [ -z "$RADIOS" ]; then
+	wifi config 2>/dev/null
+	RADIOS="$(list_radios)"
+fi
+
+for radio in $RADIOS; do
+	band="$(uci -q get wireless.$radio.band)"
+	if [ -z "$band" ]; then
+		case "$(uci -q get wireless.$radio.hwmode)" in
+			11a) band="5g" ;;
+			11g|11b) band="2g" ;;
+		esac
+	fi
+	case "$band" in
+		2g) SSID="$SSID_2G" ;;
+		5g) SSID="$SSID_5G" ;;
+		*)  continue ;;
+	esac
+
+	uci -q set wireless.$radio.disabled='0'
+	uci -q set wireless.$radio.txpower="$TXPOWER"
+	[ -n "$COUNTRY" ] && uci -q set wireless.$radio.country="$COUNTRY"
+
+	iface="$(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)\.device='$radio'\$/\1/p" | head -n1)"
+	if [ -z "$iface" ]; then
+		iface="ap_$radio"
+		uci -q set wireless.$iface='wifi-iface'
+		uci -q set wireless.$iface.device="$radio"
+	fi
+
+	uci -q set wireless.$iface.mode='ap'
+	uci -q set wireless.$iface.network='lan'
+	uci -q set wireless.$iface.ssid="$SSID"
+	uci -q set wireless.$iface.disabled='0'
+	if [ -n "$WIFI_KEY" ]; then
+		uci -q set wireless.$iface.encryption='psk2'
+		uci -q set wireless.$iface.key="$WIFI_KEY"
+	else
+		uci -q set wireless.$iface.encryption='none'
+		uci -q delete wireless.$iface.key
+	fi
+done
+
+uci -q commit system
+uci -q commit network
+uci -q commit dhcp
+uci -q commit wireless
+
+# ---- SSH banner (also shipped as /etc/banner in the image) ----
+cat > /etc/banner <<'BANNER'
+
+  +--------------------------------------------------+
+  |                                                  |
+  |              Welcome to  AbduRaheem              |
+  |       TP-Link RE205 v3  -  OpenWrt custom        |
+  |                                                  |
+  +--------------------------------------------------+
+
+BANNER
+
+exit 0
