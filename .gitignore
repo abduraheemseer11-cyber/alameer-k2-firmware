@@ -1,8 +1,0 @@
-build/
-<<<<<<< HEAD
-output/
-=======
-out/
-*.bin
-*.log
->>>>>>> d777d6c1c18170daf611fdd513ab792332509ebb
