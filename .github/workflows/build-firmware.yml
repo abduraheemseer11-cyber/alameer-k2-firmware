@@ -31,11 +31,11 @@ jobs:
 
       - name: Static project checks
         run: |
-          ./scripts/check-project.sh
+          bash ./scripts/check-project.sh
           node --check files/www/luci-static/resources/view/alameer/quicksetup.js
 
       - name: Build firmware with official ImageBuilder
-        run: ./scripts/build-imagebuilder.sh
+        run: bash ./scripts/build-imagebuilder.sh
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4

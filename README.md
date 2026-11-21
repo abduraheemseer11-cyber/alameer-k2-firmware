@@ -36,3 +36,8 @@ The workflow uses the official OpenWrt 22.03.7 ImageBuilder for `ramips/mt7620` 
 ## Recovery
 
 Keep a verified stock firmware image and a backup of the router's factory/calibration partition. Do not interrupt power during flashing. If the device is not reachable at `192.168.1.20`, connect directly and try the documented recovery method for your Breed bootloader.
+
+
+## GitHub Actions script execution compatibility
+
+The workflow invokes project shell scripts explicitly with `bash` (`bash ./scripts/check-project.sh` and `bash ./scripts/build-imagebuilder.sh`). This avoids exit code 126 when a ZIP extraction, Windows filesystem, or Git configuration drops executable file-mode metadata. The scripts also retain executable permissions in the source archive.
