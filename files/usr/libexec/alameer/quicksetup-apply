@@ -1,0 +1,316 @@
+#!/bin/sh
+# Alameer Quick Setup backend.
+# Reads /tmp/alameer-qs.json (written by the LuCI wizard), writes UCI
+# (system, network, wireless, dhcp, firewall) and reloads services in the
+# background so the HTTP response can still be delivered.
+
+CFG=/tmp/alameer-qs.json
+[ -r "$CFG" ] || { echo "config file missing" >&2; exit 1; }
+J="$(cat "$CFG")"
+rm -f "$CFG"
+
+j()   { jsonfilter -s "$J" -e "@.$1" 2>/dev/null; }
+die() { echo "$*" >&2; exit 1; }
+is_ip() { echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; }
+
+MODE="$(j mode)"
+HOST="$(j hostname)"
+SSID2G="$(j ssid2g)"; SSID5G="$(j ssid5g)"; WKEY="$(j wifi_key)"
+LAN_PROTO="$(j lan_proto)"; LAN_IP="$(j lan_ip)"; LAN_MASK="$(j lan_mask)"
+LAN_GW="$(j lan_gw)"; LAN_DNS="$(j lan_dns)"
+VLAN="$(j mgmt_vlan)"; MIP="$(j mgmt_ip)"; MMASK="$(j mgmt_mask)"; MGW="$(j mgmt_gw)"
+WAN_PROTO="$(j wan_proto)"; PPP_USER="$(j pppoe_user)"; PPP_PASS="$(j pppoe_pass)"
+WAN_IP="$(j wan_ip)"; WAN_MASK="$(j wan_mask)"; WAN_GW="$(j wan_gw)"; WAN_DNS="$(j wan_dns)"
+STA_SSID="$(j sta_ssid)"; STA_BSSID="$(j sta_bssid)"; STA_KEY="$(j sta_key)"
+STA_ENC="$(j sta_enc)"; STA_BAND="$(j sta_band)"; STA_TYPE="$(j sta_type)"
+MESH_ID="$(j mesh_id)"; MESH_KEY="$(j mesh_key)"; MESH_RADIO="$(j mesh_radio)"; MESH_ROLE="$(j mesh_role)"
+
+# ------------------------------ validation ------------------------------
+case "$MODE" in ap|router|repeater|mesh) ;; *) die "Invalid mode";; esac
+[ -n "$HOST" ] || HOST="Alameer-K2"
+[ -n "$SSID2G" ] && [ ${#SSID2G} -le 32 ] || die "Invalid 2.4GHz SSID"
+[ -n "$SSID5G" ] && [ ${#SSID5G} -le 32 ] || die "Invalid 5GHz SSID"
+if [ -n "$WKEY" ]; then
+	[ ${#WKEY} -ge 8 ] && [ ${#WKEY} -le 63 ] || die "Wi-Fi password must be 8-63 characters"
+fi
+[ -n "$LAN_PROTO" ] || LAN_PROTO=static
+[ -n "$LAN_MASK" ] || LAN_MASK=255.255.255.0
+if [ "$LAN_PROTO" = static ]; then
+	is_ip "$LAN_IP" || die "Invalid LAN IP"
+	is_ip "$LAN_MASK" || die "Invalid LAN netmask"
+fi
+if [ -n "$VLAN" ]; then
+	case "$VLAN" in *[!0-9]*) die "Invalid VLAN id";; esac
+	[ "$VLAN" -ge 2 ] && [ "$VLAN" -le 4094 ] || die "VLAN id must be 2-4094"
+	is_ip "$MIP" || die "Management VLAN needs a valid IP"
+	[ -n "$MMASK" ] || MMASK=255.255.255.0
+fi
+case "$MODE" in
+router)
+	case "$WAN_PROTO" in dhcp|pppoe|static) ;; *) die "Invalid WAN protocol";; esac
+	[ "$WAN_PROTO" = pppoe ] && { [ -n "$PPP_USER" ] || die "PPPoE username required"; }
+	[ "$WAN_PROTO" = static ] && { is_ip "$WAN_IP" && is_ip "$WAN_GW" || die "Invalid static WAN settings"; }
+	;;
+repeater)
+	[ -n "$STA_SSID" ] || die "Select or type the upstream network"
+	case "$STA_ENC" in none|psk2|psk|sae|sae-mixed) ;; *) die "Invalid upstream encryption";; esac
+	[ "$STA_ENC" = none ] || { [ ${#STA_KEY} -ge 8 ] || die "Upstream password too short"; }
+	case "$STA_TYPE" in relay|routed) ;; *) die "Invalid repeater type";; esac
+	;;
+mesh)
+	[ -n "$MESH_ID" ] || die "Mesh ID required"
+	[ ${#MESH_KEY} -ge 8 ] || die "Mesh key must be at least 8 characters"
+	;;
+esac
+
+# ------------------------------ helpers ------------------------------
+WANDEV="$(cat /etc/alameer/wan_dev 2>/dev/null)"
+[ -n "$WANDEV" ] || WANDEV="eth0.2"
+
+radios() { uci show wireless 2>/dev/null | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'; }
+
+band_of() {
+	local b
+	b="$(uci -q get wireless.$1.band)"
+	case "$b" in 2g|5g|6g) echo "$b"; return;; esac
+	case "$(uci -q get wireless.$1.hwmode)" in 11g) echo 2g; return;; 11a) echo 5g; return;; esac
+	case "$(uci -q get wireless.$1.channel)" in [1-9]|1[0-4]) echo 2g;; *) echo 5g;; esac
+}
+
+bridge_section() {
+	uci show network 2>/dev/null | sed -n "s/^network\.\([^.]*\)\.name='br-lan'\$/\1/p" | head -n1
+}
+
+fw_zone_index() {
+	local i=0
+	while uci -q get firewall.@zone[$i] >/dev/null; do
+		[ "$(uci -q get firewall.@zone[$i].name)" = "$1" ] && { echo $i; return; }
+		i=$((i+1))
+	done
+}
+fw_zone_add() {
+	local i; i="$(fw_zone_index "$1")"; [ -n "$i" ] || return
+	uci -q del_list firewall.@zone[$i].network="$2"
+	uci add_list firewall.@zone[$i].network="$2"
+}
+fw_zone_del() {
+	local i; i="$(fw_zone_index "$1")"; [ -n "$i" ] || return
+	uci -q del_list firewall.@zone[$i].network="$2"
+}
+
+set_lan() {
+	if [ "$LAN_PROTO" = dhcp ]; then
+		uci set network.lan.proto='dhcp'
+		for o in ipaddr netmask gateway dns; do uci -q delete network.lan.$o; done
+	else
+		uci set network.lan.proto='static'
+		uci set network.lan.ipaddr="$LAN_IP"
+		uci set network.lan.netmask="$LAN_MASK"
+		uci -q delete network.lan.gateway
+		uci -q delete network.lan.dns
+		[ -n "$LAN_GW" ] && uci set network.lan.gateway="$LAN_GW"
+		[ -n "$LAN_DNS" ] && uci set network.lan.dns="$LAN_DNS"
+	fi
+}
+
+# Back to a clean router-like base (removes anything a previous mode added)
+reset_base() {
+	local br; br="$(bridge_section)"
+	[ -n "$br" ] && uci -q del_list network.$br.ports="$WANDEV"
+	uci -q delete network.wwan
+	uci -q delete network.repeater_bridge
+	uci -q delete network.mgmt
+	uci -q delete network.mgmt_sw
+	fw_zone_del lan wwan
+	fw_zone_del wan wwan
+	fw_zone_del lan mgmt
+	uci -q delete dhcp.lan.ignore
+	uci set network.wan='interface'
+	uci set network.wan.device="$WANDEV"
+	uci set network.wan.proto='dhcp'
+	for o in username password ipaddr netmask gateway dns; do uci -q delete network.wan.$o; done
+}
+
+# AP-style: WAN port joins the LAN bridge, DHCP server off
+make_bridge_ap() {
+	local br; br="$(bridge_section)"
+	[ -n "$br" ] || die "br-lan device not found in /etc/config/network"
+	uci -q del_list network.$br.ports="$WANDEV"
+	uci add_list network.$br.ports="$WANDEV"
+	uci -q delete network.wan
+	uci -q delete network.wan6
+	uci set dhcp.lan.ignore='1'
+}
+
+# Optional tagged management interface (swconfig targets such as mt7620)
+setup_mgmt_vlan() {
+	[ -n "$VLAN" ] || return
+	local sw cpu ports newp s p cpudev
+	sw="$(uci show network | sed -n 's/^network\.\([^.=]*\)=switch$/\1/p' | head -n1)"
+	[ -n "$sw" ] || { echo "No swconfig switch found - management VLAN skipped" >&2; return; }
+	cpu=""; ports=""
+	for s in $(uci show network | sed -n 's/^network\.\([^.=]*\)=switch_vlan$/\1/p'); do
+		for p in $(uci -q get network.$s.ports); do
+			case "$p" in
+			*t) cpu="${p%t}";;
+			*) case " $ports " in *" $p "*) ;; *) ports="$ports $p";; esac;;
+			esac
+		done
+	done
+	[ -n "$cpu" ] || cpu=6
+	newp=""
+	for p in $ports; do newp="$newp ${p}t"; done
+	newp="${newp# } ${cpu}t"
+	cpudev="${WANDEV%%.*}"
+	uci set network.mgmt_sw='switch_vlan'
+	uci set network.mgmt_sw.device="$sw"
+	uci set network.mgmt_sw.vlan="$VLAN"
+	uci set network.mgmt_sw.ports="$newp"
+	uci set network.mgmt='interface'
+	uci set network.mgmt.device="${cpudev}.${VLAN}"
+	uci set network.mgmt.proto='static'
+	uci set network.mgmt.ipaddr="$MIP"
+	uci set network.mgmt.netmask="$MMASK"
+	[ -n "$MGW" ] && uci set network.mgmt.gateway="$MGW"
+	fw_zone_add lan mgmt
+}
+
+# Radios + AP ifaces (STA / mesh ifaces are added afterwards by the mode code)
+setup_radios_and_aps() {
+	local r b ssid s
+	while uci -q delete wireless.@wifi-iface[0]; do :; done
+	for r in $(radios); do
+		b="$(band_of $r)"
+		uci -q delete wireless.$r.disabled
+		uci set wireless.$r.channel='auto'
+		case "$b" in
+		2g) uci set wireless.$r.htmode='HT40'; ssid="$SSID2G";;
+		5g) uci set wireless.$r.htmode='VHT80'; ssid="$SSID5G";;
+		*) continue;;
+		esac
+		s="ap_$b"
+		uci set wireless.$s='wifi-iface'
+		uci set wireless.$s.device="$r"
+		uci set wireless.$s.mode='ap'
+		uci set wireless.$s.network='lan'
+		uci set wireless.$s.ssid="$ssid"
+		if [ -n "$WKEY" ]; then
+			uci set wireless.$s.encryption='psk2'
+			uci set wireless.$s.key="$WKEY"
+		else
+			uci set wireless.$s.encryption='none'
+			uci -q delete wireless.$s.key
+		fi
+	done
+}
+
+radio_for_band() {
+	local r
+	for r in $(radios); do [ "$(band_of $r)" = "$1" ] && { echo "$r"; return; }; done
+}
+
+# ------------------------------ apply ------------------------------
+uci set system.@system[0].hostname="$HOST"
+
+reset_base
+setup_radios_and_aps
+
+case "$MODE" in
+ap)
+	make_bridge_ap
+	set_lan
+	setup_mgmt_vlan
+	;;
+
+router)
+	set_lan
+	uci set network.wan.proto="$WAN_PROTO"
+	case "$WAN_PROTO" in
+	pppoe)
+		uci set network.wan.username="$PPP_USER"
+		uci set network.wan.password="$PPP_PASS"
+		;;
+	static)
+		uci set network.wan.ipaddr="$WAN_IP"
+		uci set network.wan.netmask="${WAN_MASK:-255.255.255.0}"
+		uci set network.wan.gateway="$WAN_GW"
+		[ -n "$WAN_DNS" ] && uci set network.wan.dns="$WAN_DNS"
+		;;
+	esac
+	;;
+
+repeater)
+	R="$(radio_for_band "${STA_BAND:-2g}")"
+	[ -n "$R" ] || die "No radio found for band ${STA_BAND:-2g}"
+	uci set wireless.sta_${STA_BAND:-2g}='wifi-iface'
+	uci set wireless.sta_${STA_BAND:-2g}.device="$R"
+	uci set wireless.sta_${STA_BAND:-2g}.mode='sta'
+	uci set wireless.sta_${STA_BAND:-2g}.network='wwan'
+	uci set wireless.sta_${STA_BAND:-2g}.ssid="$STA_SSID"
+	[ -n "$STA_BSSID" ] && uci set wireless.sta_${STA_BAND:-2g}.bssid="$STA_BSSID"
+	uci set wireless.sta_${STA_BAND:-2g}.encryption="$STA_ENC"
+	[ "$STA_ENC" = none ] || uci set wireless.sta_${STA_BAND:-2g}.key="$STA_KEY"
+
+	uci set network.wwan='interface'
+	uci set network.wwan.proto='dhcp'
+
+	if [ "$STA_TYPE" = relay ]; then
+		# transparent bridge (relayd): no double NAT, LAN keeps its address
+		set_lan
+		uci set dhcp.lan.ignore='1'
+		uci set network.repeater_bridge='interface'
+		uci set network.repeater_bridge.proto='relay'
+		uci add_list network.repeater_bridge.network='lan'
+		uci add_list network.repeater_bridge.network='wwan'
+		fw_zone_add lan wwan
+	else
+		# routed WISP: NAT between wwan (uplink) and LAN
+		set_lan
+		fw_zone_add wan wwan
+	fi
+	;;
+
+mesh)
+	if [ "$MESH_ROLE" = node ]; then
+		make_bridge_ap
+		set_lan
+		setup_mgmt_vlan
+	else
+		set_lan
+	fi
+	for b in ${MESH_RADIO:-5g}; do
+		[ "$b" = both ] && b="2g 5g"
+		for bb in $b; do
+			R="$(radio_for_band $bb)"
+			[ -n "$R" ] || continue
+			uci set wireless.mesh_$bb='wifi-iface'
+			uci set wireless.mesh_$bb.device="$R"
+			uci set wireless.mesh_$bb.mode='mesh'
+			uci set wireless.mesh_$bb.network='lan'
+			uci set wireless.mesh_$bb.mesh_id="$MESH_ID"
+			uci set wireless.mesh_$bb.mesh_fwding='1'
+			uci set wireless.mesh_$bb.encryption='sae'
+			uci set wireless.mesh_$bb.key="$MESH_KEY"
+		done
+	done
+	;;
+esac
+
+uci commit system
+uci commit network
+uci commit wireless
+uci commit dhcp
+uci commit firewall
+echo "$MODE" > /etc/alameer/mode
+
+# reload in background so the HTTP reply is delivered first
+{
+	sleep 3
+	/etc/init.d/system reload
+	/etc/init.d/network restart
+	/etc/init.d/dnsmasq restart
+	/etc/init.d/firewall reload
+} >/dev/null 2>&1 </dev/null &
+
+echo "OK"
+exit 0

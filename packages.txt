@@ -1,0 +1,36 @@
+# ImageBuilder package list – whitespace/newline separated, '#' lines ignored.
+# A leading '-' removes a package from the profile defaults.
+
+# ---- Remove default bloat (IPv6, extra SSL, basic wpad) ----
+-odhcp6c
+-odhcpd-ipv6only
+-ip6tables
+-wpad-basic-mbedtls
+-libustream-mbedtls
+
+# ---- Web server: plain HTTP only (no px5g / luci-ssl) ----
+uhttpd
+uhttpd-mod-ubus
+
+# ---- LuCI (JavaScript based, OpenWrt 25.12) ----
+luci-base
+luci-mod-network
+luci-mod-status
+luci-mod-system
+luci-app-firewall
+luci-proto-ppp
+luci-proto-relay
+# Our theme is built on top of the bootstrap theme CSS (and acts as a safe fallback)
+luci-theme-bootstrap
+
+# ---- WAN protocols ----
+ppp
+ppp-mod-pppoe
+
+# ---- WISP features ----
+swconfig
+relayd
+# 802.11s mesh + WPA3/SAE. mbedtls variant re-uses the library already needed by apk.
+# If the build says it is missing, use wpad-mesh-wolfssl instead.
+wpad-mesh-mbedtls
+mini_snmpd

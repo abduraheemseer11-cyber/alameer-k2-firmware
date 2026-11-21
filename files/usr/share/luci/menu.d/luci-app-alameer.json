@@ -1,0 +1,13 @@
+{
+	"admin/quicksetup": {
+		"title": "Quick Setup",
+		"order": 5,
+		"action": {
+			"type": "view",
+			"path": "alameer/quicksetup"
+		},
+		"depends": {
+			"acl": [ "luci-app-alameer" ]
+		}
+	}
+}
