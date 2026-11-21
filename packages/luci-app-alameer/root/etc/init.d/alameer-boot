@@ -1,0 +1,10 @@
+#!/bin/sh /etc/rc.common
+# ALAMEER SOFTWARE - boot-time self-healing for Wi-Fi provisioning.
+# If first-boot provisioning ran before the radios were probed, finish it now.
+START=98
+
+start() {
+	[ -f /etc/alameer/wifi.pending ] || return 0
+	logger -t alameer-boot "wifi.pending present: configuring radios"
+	/usr/sbin/alameer-apply wifi-ensure 2>&1 | logger -t alameer-boot
+}
