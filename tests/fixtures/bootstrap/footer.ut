@@ -1,5 +1,0 @@
-		</div></div></div>
-		<footer><a href="https://github.com/openwrt/luci">Powered by {{ version.luciname }} ({{ version.luciversion }})</a></footer>
-		<script type="text/javascript">L.require('menu-bootstrap')</script>
-	</body>
-</html>

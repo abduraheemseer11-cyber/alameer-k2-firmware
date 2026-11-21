@@ -1,9 +1,0 @@
-{# ALAMEER SOFTWARE - LuCI ucode theme footer. #}
-		<footer id="amfoot">
-			<span><b>ALAMEER SOFTWARE</b> · {{ _('Developed by Eng. Abdulrahim Al-Makhadhi') }}</span>
-			<span>Phicomm K2 V22.5 · {{ _('Powered by OpenWrt / LuCI') }}</span>
-		</footer>
-	</main>
-	<script>L.require('menu-alameer')</script>
-</body>
-</html>

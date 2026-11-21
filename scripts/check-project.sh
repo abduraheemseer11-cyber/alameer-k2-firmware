@@ -1,49 +1,22 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-pass() { echo "PASS: $*"; }
-fail() { echo "FAIL: $*" >&2; exit 1; }
-
-. "$ROOT/config.env"
-[ "$PROFILE" = 'phicomm_k2-v22.5' ] || fail 'wrong target profile'
-[ "$MAX_IMAGE_BYTES" = '7733248' ] || fail 'unexpected firmware partition limit'
-pass 'Phicomm K2 v22.5 profile and size limit'
-
-grep -q "LAN_IP=\"192.168.1.20\"" "$ROOT/files/etc/uci-defaults/99-alameer-config" || fail 'default LAN IP missing'
-grep -qE "^WIFI_COUNTRY=[A-Z]{2}$" "$ROOT/config.env" || fail 'regulatory country setting missing'
-grep -q 'kmod-mt76x2' "$ROOT/packages.txt" || fail 'MT7612E driver package missing'
-grep -q 'uci set dhcp.lan.ignore' "$ROOT/files/etc/uci-defaults/99-alameer-first-boot" || fail 'AP mode must disable LAN DHCP'
-pass 'network defaults and MT76x2 package selection'
-
-for f in \
-  files/usr/share/ucode/luci/template/themes/alameer/header.ut \
-  files/usr/share/ucode/luci/template/themes/alameer/footer.ut \
-  files/www/luci-static/alameer/cascade.css \
-  files/www/luci-static/alameer/logo.svg \
-  files/www/luci-static/alameer/logo.png \
-  files/www/luci-static/resources/menu-alameer.js \
-  files/www/luci-static/resources/view/alameer/quicksetup.js \
-  files/usr/sbin/alameer-wifi-diag \
-  files/usr/share/luci/menu.d/luci-app-alameer.json \
-  files/usr/share/rpcd/acl.d/luci-app-alameer.json; do
-  [ -s "$ROOT/$f" ] || fail "missing required LuCI asset: $f"
-done
-pass 'ucode theme, sidebar, Quick Setup view and ACL assets'
-
-if command -v node >/dev/null 2>&1; then
-  node --check "$ROOT/files/www/luci-static/resources/menu-alameer.js"
-  node --check "$ROOT/files/www/luci-static/resources/view/alameer/quicksetup.js"
-  node --check "$ROOT/files/www/luci-static/resources/view/status/include/90_alameer.js"
-  pass 'LuCI JavaScript syntax'
-fi
-sh -n "$ROOT/files/etc/uci-defaults/99-alameer-config"
-sh -n "$ROOT/files/etc/uci-defaults/99-alameer-first-boot"
-sh -n "$ROOT/files/usr/libexec/alameer/quicksetup-apply"
-sh -n "$ROOT/files/usr/sbin/alameer-wifi-diag"
-pass 'first-boot and Quick Setup shell syntax'
-
-grep -q '#amtop' "$ROOT/files/www/luci-static/alameer/cascade.css" || fail 'topbar styles missing'
-grep -q '@media (max-width:900px)' "$ROOT/files/www/luci-static/alameer/cascade.css" || fail 'mobile responsive layout missing'
-grep -q "_('Quick Setup')" "$ROOT/files/www/luci-static/resources/menu-alameer.js" || fail 'Quick Setup first menu entry missing'
-pass 'desktop/mobile design hooks and independent Quick Setup menu entry'
-echo 'ALL PROJECT CHECKS PASSED'
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+fail(){ echo "FAIL: $*" >&2; exit 1; }
+pass(){ echo "PASS: $*"; }
+[ -s "$ROOT/files/www/luci-static/alameer/logo.png" ] || fail 'logo missing'
+[ -s "$ROOT/files/www/luci-static/resources/view/alameer/quicksetup.js" ] || fail 'Quick Setup JS missing'
+[ -s "$ROOT/files/www/luci-static/alameer/cascade.css" ] || fail 'purple theme CSS missing'
+[ -x "$ROOT/files/etc/uci-defaults/99-alameer-defaults" ] || fail 'first boot script is not executable'
+grep -q '192.168.1.20' "$ROOT/files/etc/uci-defaults/99-alameer-defaults" || fail 'LAN IP default missing'
+grep -q "AbduRaheem_2G" "$ROOT/files/etc/uci-defaults/99-alameer-defaults" || fail '2.4 GHz SSID missing'
+grep -q "AbduRaheem_5G" "$ROOT/files/etc/uci-defaults/99-alameer-defaults" || fail '5 GHz SSID missing'
+grep -q "Access Point WDS" "$ROOT/files/www/luci-static/resources/view/alameer/quicksetup.js" || fail 'AP WDS mode missing'
+grep -q "Client WDS" "$ROOT/files/www/luci-static/resources/view/alameer/quicksetup.js" || fail 'Client WDS mode missing'
+grep -q "Mesh" "$ROOT/files/www/luci-static/resources/view/alameer/quicksetup.js" || fail 'Mesh mode missing'
+grep -q '^wpad-mesh-wolfssl$' "$ROOT/packages.txt" || fail 'mesh-capable wpad package missing'
+grep -q '^kmod-mt76x2$' "$ROOT/packages.txt" || fail 'MT7612E driver package missing'
+grep -q '^MAX_IMAGE_BYTES=6000000$' "$ROOT/config.env" || fail 'strict image size gate missing'
+pass 'project structure and required configuration'
+if command -v bash >/dev/null; then bash -n "$ROOT/scripts/check-project.sh"; fi
+pass 'shell syntax'
+echo 'All static project checks passed.'

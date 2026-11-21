@@ -1,3 +1,0 @@
-{% include('themes/bootstrap/header') %}
-<form method="post"><input name="luci_username"><input name="luci_password" type="password"></form>
-{% include('themes/bootstrap/footer') %}

@@ -1,84 +1,38 @@
-# AlMakhdhi SoftWare — OpenWrt 24.10 لجهاز TP-Link RE205 v3
+# ALAMEER SOFTWARE V3 — Purple Edition
 
-فيرموير مخصص لـ **TP-Link RE205 v3** (MT7628AN، ‏8MB Flash، ‏64MB RAM، `ramips/mt76x8`) يُبنى تلقائياً عبر **GitHub Actions** باستخدام **OpenWrt ImageBuilder** الرسمي، مع واجهة LuCI مخصصة بهوية **AlMakhdhi SoftWare** وشعار **ALAMEER SOFTWARE** الأصلي.
+Clean GitHub Actions project for the **Phicomm K2 v22.5 or newer** (`ramips/mt7620`, profile `phicomm_k2-v22.5`) using OpenWrt 22.03.7 ImageBuilder.
 
-## الإعدادات الافتراضية المدمجة (لم تتغير)
+## What is included
 
-| الإعداد | القيمة |
-|---|---|
-| عنوان LAN | `192.168.1.20` / `255.255.255.0` |
-| DHCP IPv4 | معطّل |
-| DHCPv6 / RA / NDP | معطّلة (مع إزالة ULA و ip6assign) |
-| شبكة 2.4GHz | `AbduRaheem_2G` |
-| شبكة 5GHz | `ABDURAHEEM_5G` |
-| قدرة الإرسال | 20 dBm (ضمن حدود العتاد والتشريعات) |
-| اسم الجهاز | `AbduRaheem` |
-| لافتة SSH | `files/etc/banner` |
+- Deep-purple LuCI visual override (`#24103F`) with responsive navigation and ALAMEER logo.
+- A dedicated **Quick Setup** entry at the top of the LuCI admin menu.
+- Independent 2.4 GHz and 5 GHz configuration.
+- Per-radio modes: Access Point, Access Point WDS, Mesh, Client WDS.
+- 1–4 SSIDs per radio for AP / AP WDS mode. Names are generated from the base name (`AbduRaheem_2G`, `AbduRaheem_2G+2`, ...).
+- Client WDS accepts the upstream SSID and optional passphrase. Mesh accepts a mesh ID.
+- First-boot defaults: LAN `192.168.1.20/24`, DHCP server off, DHCPv6 off, 2.4 GHz channel 6 / 20 MHz, 5 GHz channel 36 / 40 MHz, open default SSIDs.
+- Firmware size gate: image must be **strictly smaller than 6,000,000 bytes** or the workflow fails without publishing a firmware artifact.
 
-تُطبَّق من `files/etc/uci-defaults/99-custom-settings` (يمكنك تعديل المتغيرات في أعلى الملف: `WIFI_KEY`، `COUNTRY`، `GATEWAY`، `DNS`).
+## Build
 
-## الواجهة الجديدة
+1. Upload the contents of this folder to a new GitHub repository.
+2. Open **Actions → Build ALAMEER K2 V3 → Run workflow**.
+3. Download `ALAMEER-K2-V3-firmware` only if the job succeeds.
 
-* **توافق الهاتف**: يفرض `amk-early.js` وسم viewport بعرض الجهاز، ويتعرفان على شاشة الهاتف الفعلية حتى عند تفعيل Desktop site في المتصفح؛ وتفرض قواعد `cascade.css` عرضاً كاملاً للشريط والحاويات، وقائمة منزلقة وعموداً واحداً للبطاقات.
-* **الشريط العلوي** بنفسجي غامق ثابت: الشعار الأصلي داخل شارة دائرية بيضاء + النص `AlMakhdhi SoftWare` + زر القائمة (Hamburger) + تبديل اللغة (العربية/English) + وضع داكن اختياري. مؤشر "التغييرات غير المحفوظة" الأصلي في LuCI يبقى كما هو.
-* **القائمة الجانبية** تُولَّد من شجرة قوائم LuCI الفعلية (`ui.menu`)، لذلك تظهر **كل** صفحات LuCI والحزم المثبتة تلقائياً (Status، System، Network، Services/VPN إن وُجدت، Logout …) ولا تُحذف أي وظيفة. قابلة للتمرير، وتتحول إلى قائمة منزلقة على الهاتف مع طبقة تعتيم، وتُغلق بالضغط على الخارج أو Esc.
-* **Dashboard** (`admin/dashboard`، أول عنصر فتظهر بعد تسجيل الدخول): بيانات حقيقية من `ubus`/`sysfs` تتحدث كل 3 ثوانٍ — اسم الجهاز، الموديل، إصدار OpenWrt، مدة التشغيل، عنوان IP، حالة الإنترنت (وجود مسار افتراضي + `ping` إلى 1.1.1.1)، حالة الواي فاي وعدد العملاء، المعالج وحمل النظام، الحرارة إن وُجد حساس (أغلب أجهزة MT7628 لا تملك حساساً فيظهر "غير متوفر")، الذاكرة والتخزين، ورسمان بيانيان (RAM وحمل المعالج) من القراءات الفعلية.
-* **Quick Setup** (`admin/quicksetup`): معالج من 4 خطوات (ترحيب ← LAN ← Wireless ← مراجعة وتطبيق). يقرأ الإعدادات الحالية من UCI، ويتحقق من المدخلات (IP، قناع متصل، Gateway داخل نفس الشبكة، SSID حتى 32 بايت، كلمة مرور WPA2 من 8 إلى 63 حرفاً أو 64 hex)، ثم يحفظ بـ `uci.save()` ويطبق بـ `uci.apply()` (نفس آلية "Save & Apply"). كلمة مرور الواي فاي اختيارية: **بدون كلمة مرور = شبكة مفتوحة** (مع تحذير). عند تغيير عنوان IP يُعرض تنبيه بالعنوان الجديد ثم يُحوَّل المتصفح إليه تلقائياً. الخطوات تعرض فقط الفروقات الفعلية ولا تُظهر كلمة المرور في المراجعة.
-* **اللغة**: العربية RTL والإنجليزية LTR. حزمة `luci-i18n-base-ar` تترجم صفحات LuCI الأصلية، وملف `almakhdhi/i18n.js` يترجم عناصر الثيم الجديدة. الاتجاه يُضبط تلقائياً حسب لغة LuCI.
+The workflow uses the official OpenWrt 22.03.7 ImageBuilder for `ramips/mt7620` and verifies its SHA-256 before use.
 
-## كيف يعمل (ولماذا هذه الطريقة)
+## Important hardware / regulatory notes
 
-بنية قوالب LuCI تتغير بين الإصدارات، ولا يمكن تخمين `header.ut` بأمان. لذلك:
+- This project targets **Phicomm K2 v22.5 or newer only**. Do not flash it on v22.4 or K2G.
+- The official device definition reserves a 7,552 KiB firmware partition and includes the MT7612E driver package. The 6,000,000-byte requirement is a stricter user-requested output gate, not the device's partition limit.
+- `txpower` values (30 dBm on 2.4 GHz and 24 dBm on 5 GHz) are requested configuration ceilings. The driver and regulatory database may clamp the actual power; the firmware does not bypass regulatory restrictions.
+- Channel 36 may be unavailable under the active regulatory domain. The project does not force an unlawful country code. If the radio is disabled by the regulatory database, inspect `iw reg get`, `iw phy`, and `logread` before changing country settings.
+- Mesh and WDS depend on the radio driver, peer configuration, and WPA supplicant/hostapd support. They must be tested with the actual peer device. Client WDS is not the same as a universal transparent repeater.
+- Multiple SSIDs share the same physical radio/channel and airtime. The UI limits each radio to four virtual SSIDs to reduce resource pressure on the K2's 64 MB RAM.
+- Default Wi-Fi networks are open as requested. Set passwords before using the router on a public or production network.
+- The default setup removes logical `wan` / `wan6` interfaces but does not rewrite the board's low-level switch VLAN map. Confirm the physical Ethernet port mapping before assuming the WAN jack has been bridged into LAN.
+- No actual firmware compilation or on-device validation is claimed by the source ZIP. GitHub Actions performs the real ImageBuilder build and image-size gate.
 
-1. أثناء البناء، `scripts/prepare-theme.sh` يحمّل حزمة `luci-theme-bootstrap` **الحقيقية** من نفس إصدار OpenWrt (مع التحقق من SHA256) ويشتق منها قوالب الثيم `almakhdhi` عبر `scripts/patch_theme.py`، بثلاثة إدراجات فقط (سكربت مبكر لضبط الاتجاه/الوضع، وأيقونة الموقع، وتحميل `menu-almakhdhi`). إن تغيّرت بنية القوالب يتوقف البناء برسالة واضحة بدل إنتاج واجهة معطوبة.
-2. `cascade.css` الخاص بالثيم يستورد `/luci-static/bootstrap/cascade.css` المثبت أصلاً (نماذج، جداول، أزرار، نوافذ…) ثم يضيف الهوية البنفسجية والتخطيط الجديد.
-3. القائمة الأصلية لـ LuCI تعمل أسفل الواجهة ولا تُخفى إلا بعد نجاح بناء القائمة الجديدة (`body.amk-ready`)، فإذا فشل أي سكربت تبقى القائمة الأصلية ظاهرة ولا تضيع أي صفحة.
-4. لا مكتبات خارجية ولا React/Vue ولا خطوط ويب ولا حزم جديدة. كل ما أضافه الثيم نحو **77KB** غير مضغوطة (والشعار المصغَّر 8.5KB). الشعار الأصلي بدقته الكاملة محفوظ في `assets/logo-original.png` والنسخة المصغّرة (نفس التصميم) في الفيرموير.
+## Recovery
 
-`luci-theme-bootstrap` يبقى مثبتاً كثيم احتياطي.
-
-## هيكل المشروع
-
-```
-.github/workflows/build.yml                      بناء GitHub Actions
-packages.txt                                     الحزم (لم تتغير)
-assets/logo-original.png                         الشعار الأصلي
-scripts/prepare-theme.sh, patch_theme.py         اشتقاق قوالب الثيم من LuCI الرسمي
-files/etc/banner, files/etc/uci-defaults/99-...  الإعدادات الافتراضية (محفوظة)
-files/etc/uci-defaults/98-almakhdhi-theme        تفعيل الثيم كافتراضي
-files/usr/share/luci/menu.d/...json              صفحتا Dashboard وQuick Setup في قائمة LuCI
-files/usr/share/rpcd/acl.d/...json               صلاحيات ACL (قراءة فقط لما تحتاجه الصفحات)
-files/www/luci-static/almakhdhi/                 CSS، الشعار، favicon
-files/www/luci-static/resources/                 menu-almakhdhi.js وصفحات dashboard/quicksetup وi18n
-tests/                                           الاختبارات الآلية
-```
-
-## الرفع والبناء على GitHub
-
-1. أنشئ مستودعاً جديداً، فك الضغط، وارفع **محتويات** المجلد كما هي (انتبه لظهور المجلد المخفي `.github`). من الطرفية: `git init && git add -A && git commit -m "AlMakhdhi SoftWare" && git branch -M main && git remote add origin <URL> && git push -u origin main`.
-2. افتح **Actions** ← *Build OpenWrt - TP-Link RE205 v3*. يعمل تلقائياً عند كل push على `main`، أو من **Run workflow** (يمكن تحديد الإصدار مثل `24.10.8`).
-3. الخطوات: اختبارات آلية ← تحديد أحدث 24.10.x ← تنزيل ImageBuilder والتحقق من SHA256 ← اشتقاق قوالب الثيم ← `make image` ← فحص محتوى الصورة ← رفع `factory` و`sysupgrade` كـ Artifacts.
-4. إن فشلت خطوة "Derive LuCI theme templates" فحمّل الـ artifact `upstream-luci-theme-bootstrap` (يحتوي قوالب LuCI الفعلية) وأرسله لي لأعدّل الثيم.
-
-## الاستخدام بعد التفليش
-
-* ادخل إلى `http://192.168.1.20/` (جهازك يحتاج IP ثابتاً في نفس الشبكة لأن DHCP معطّل). لا توجد كلمة مرور لـ root في أول إقلاع: عيّنها من LuCI (System ← Administration) أو عبر telnet بالأمر `passwd`، وبعدها يعمل SSH.
-* الشبكتان مفتوحتان افتراضياً كما في OpenWrt؛ ضع كلمة مرور من Quick Setup أو عبر `WIFI_KEY` في السكربت قبل البناء.
-* **العودة إلى الثيم الأصلي** إذا تعطلت الواجهة لأي سبب (من SSH أو Failsafe):
-  `uci set luci.main.mediaurlbase='/luci-static/bootstrap' && uci commit luci`
-
-## الاختبارات
-
-```
-bash tests/run_tests.sh        # يحتاج bash وpython3 وnode فقط، دون جهاز ودون إنترنت
-```
-
-* فحص صياغة كل ملفات JS؛ فحص المسارات وJSON والـ ACL والـ CSS وميزانية الحجم وخطوات سير العمل والحزم.
-* اختبارات وحدات لمحققات Quick Setup وخطة التعديل (أكثر من 18 حالة)، وتغطية الترجمة العربية لكل نص أضافه الثيم.
-* تشغيل شيفرة Dashboard وQuick Setup والقائمة الجانبية فعلياً على DOM وهمي مع بيانات ubus/uci محاكاة (تدفق المعالج كاملاً، الأخطاء، الأجهزة أحادية النطاق، العربية، الهاتف/الحاسوب، تبديل اللغة، صفحة الدخول).
-* تشغيل سكربتي `98` و`99` الحقيقيين على `uci` محاكى والتحقق من كل قيمة افتراضية.
-* في GitHub Actions أيضاً: فحص أن ملفات الثيم والإعدادات موجودة فعلاً داخل نظام الملفات الذي سيُحزَّم.
-
-### ما الذي لم يُختبر
-
-لم يُشغَّل الفيرموير على راوتر حقيقي ولم يُبنَ فعلياً في بيئة التطوير هذه (لا إنترنت). **لم تُفحص** القوالب الحقيقية لـ LuCI ولا العرض البصري في المتصفح ولا تطبيق uci/ubus الحقيقي. هذه الأمور يتحقق منها سير عمل GitHub (حتى مرحلة البناء) ثم تجربتك على الجهاز. أرسل لي لقطة شاشة أو سجل الخطأ وأضبط التصميم.
+Keep a verified stock firmware image and a backup of the router's factory/calibration partition. Do not interrupt power during flashing. If the device is not reachable at `192.168.1.20`, connect directly and try the documented recovery method for your Breed bootloader.

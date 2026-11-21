@@ -1,7 +1,32 @@
-# One package per line. Prefix with "-" to remove a default package.
-# NOTE: ImageBuilder has no .config file; packages are passed to `make image PACKAGES=...`.
+# Core LuCI web interface and required tools
 luci
-luci-i18n-base-ar
-wpad-basic-mbedtls
-kmod-mt7603
-kmod-mt76x0e
+luci-ssl
+luci-app-firewall
+luci-theme-bootstrap
+
+# MT7612E 5 GHz driver is normally part of the device profile; list explicitly too.
+kmod-mt76x2
+
+# Full hostapd/wpa_supplicant build with AP/STA/WDS/Mesh support.
+-wpad-basic-mbedtls
+-wpad-basic-wolfssl
+-wpad-basic-openssl
+-wpad-mini
+-wpad-wolfssl
+wpad-mesh-wolfssl
+
+# Wireless diagnostics and repeater bridge helper
+iw
+iwinfo
+wireless-regdb
+relayd
+luci-proto-relay
+
+# Keep this build lean on an 8 MB flash device
+-odhcp6c
+-odhcpd-ipv6only
+-ip6tables
+-kmod-ip6tables
+-ppp
+-ppp-mod-pppoe
+-luci-proto-ppp
