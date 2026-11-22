@@ -17,7 +17,7 @@ require("luci.http").prepare_content("text/html")
         <h2>مرحباً بك في Alameer Software OS</h2>
         <p class="login-sub">أدخل كلمة المرور للمتابعة</p>
         <form method="post" action="<%=REQUEST_URI%>">
-            <!-- هذا الحقل إجباري لكي يتعرف LuCI على المستخدم -->
+            <!-- هذا الحقل إجباري لكي يتعرف LuCI على اسم المستخدم -->
             <input type="hidden" name="luci_username" value="root" />
             <div class="input-group">
                 <label for="luci_password">كلمة المرور</label>
@@ -33,4 +33,4 @@ require("luci.http").prepare_content("text/html")
         </div>
     </div>
 </body>
-</html>
+            </html>
