@@ -82,7 +82,7 @@ jobs:
         run: |
           cd openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64
           make image \
-            PROFILE="phicomm_k2-v22.4" \
+            PROFILE="phicomm_psg1218a" \
             PACKAGES="luci luci-compat luci-lib-jsonc luci-i18n-base-ar luci-i18n-firewall-ar watchcat lldpd iwinfo luci-app-commands wpad-openssl -luci-app-firewall -luci-app-opkg -luci-theme-bootstrap -wpad-basic-wolfssl -wpad-basic" \
             FILES="./files" \
             DISABLED_SERVICES="dnsmasq firewall odhcpd" \
