@@ -1,0 +1,6 @@
+config lldpd
+    option enable_cdp '1'
+    option enable_fdp '0'
+    option enable_sonmp '0'
+    option enable_edp '1'
+    option interface 'eth0'

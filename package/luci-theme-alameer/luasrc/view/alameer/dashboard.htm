@@ -1,0 +1,51 @@
+<%+header%>
+<div class="card">
+    <h3>حالة النظام</h3>
+    <p><strong>اسم المضيف:</strong> <%= luci.sys.hostname() %></p>
+    <p><strong>مدة التشغيل:</strong> <%= luci.sys.uptime() %> ثانية</p>
+    <p><strong>حمل المعالج:</strong> <%= luci.sys.loadavg()[1] %></p>
+    <p><strong>الذاكرة الحرة:</strong> <%= math.floor(luci.sys.meminfo().memfree / 1024) %> كيلوبايت</p>
+    <div class="progress-bar"><div class="progress-fill" style="width: <%= math.floor(luci.sys.meminfo().memused / luci.sys.meminfo().memtotal * 100) %>%"></div></div>
+    <p style="font-size:0.8rem; color:#666;">استهلاك الذاكرة: <%= math.floor(luci.sys.meminfo().memused / luci.sys.meminfo().memtotal * 100) %>%</p>
+</div>
+
+<div class="card">
+    <h3>وضع التشغيل (Mode Switcher)</h3>
+    <form method="post" action="<%=luci.dispatcher.build_url('admin/status/alameer/mode')%>">
+        <select name="mode" style="padding:8px; border-radius:6px; font-family:Cairo;">
+            <option value="ap">أكسس بوينت مايكروتك (AP Mode)</option>
+            <option value="router">راوتر منزلي (Home Router)</option>
+            <option value="repeater">مقوي إشارة لاسلكي (Repeater)</option>
+        </select>
+        <button type="submit" class="btn btn-primary" style="margin-top:10px;">تطبيق الوضع</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>ماسح الشبكات اللاسلكية (Site Survey)</h3>
+    <div id="scan-results">
+        <p>اضغط على "بدء المسح" للبحث عن الشبكات القريبة.</p>
+        <button onclick="startScan()" class="btn btn-accent">بدء المسح</button>
+    </div>
+</div>
+
+<script>
+function startScan() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "<%=luci.dispatcher.build_url('admin/status/alameer/scan')%>?radio=radio0", true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var data = JSON.parse(xhr.responseText);
+            var html = "<table style='width:100%; border-collapse:collapse; font-size:0.85rem;'>";
+            html += "<tr style='background:#f0f0f0;'><th>SSID</th><th>القناة</th><th>الإشارة</th><th>التشفير</th></tr>";
+            data.forEach(function(net) {
+                html += "<tr><td>" + net.ssid + "</td><td>" + net.channel + "</td><td>" + net.signal + " dBm</td><td>" + (net.encryption || "مفتوح") + "</td></tr>";
+            });
+            html += "</table>";
+            document.getElementById("scan-results").innerHTML = html;
+        }
+    };
+    xhr.send();
+}
+</script>
+<%+footer%>

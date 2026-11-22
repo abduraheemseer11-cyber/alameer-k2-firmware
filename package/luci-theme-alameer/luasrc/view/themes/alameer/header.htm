@@ -1,0 +1,26 @@
+<%
+require("luci.http").prepare_content("text/html")
+-%>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alameer Software OS - <%= boardinfo.hostname or "Alameer-K2" %></title>
+    <link rel="stylesheet" href="<%=media%>/cascade.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="alameer-body">
+<div class="alameer-wrapper">
+    <header class="alameer-header">
+        <div class="logo-area">
+            <img src="<%=media%>/logo.png" alt="Alameer Software" class="logo-img">
+            <span class="brand-text">ALAMEER SOFTWARE</span>
+        </div>
+        <nav class="alameer-nav">
+            <a href="/cgi-bin/luci/">لوحة التحكم</a>
+            <a href="/cgi-bin/luci/admin/status/overview">الحالة</a>
+            <a href="/cgi-bin/luci/admin/network/wireless">الشبكة اللاسلكية</a>
+        </nav>
+    </header>
+    <main class="alameer-main">

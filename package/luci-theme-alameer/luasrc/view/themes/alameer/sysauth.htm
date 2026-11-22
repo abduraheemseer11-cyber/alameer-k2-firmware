@@ -1,0 +1,35 @@
+<%
+require("luci.http").prepare_content("text/html")
+-%>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - Alameer Software OS</title>
+    <link rel="stylesheet" href="<%=media%>/cascade.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="alameer-login-body">
+    <div class="login-card">
+        <div class="login-logo">
+            <img src="<%=media%>/logo.png" alt="Alameer Software">
+        </div>
+        <h2>مرحباً بك في Alameer Software OS</h2>
+        <p class="login-sub">أدخل كلمة المرور للمتابعة</p>
+        <form method="post" action="<%=REQUEST_URI%>">
+            <div class="input-group">
+                <label for="luci_password">كلمة المرور</label>
+                <input type="password" id="luci_password" name="luci_password" placeholder="••••••••" required>
+            </div>
+            <% if (fuser and fuser ~= "") then %>
+                <p class="error-msg">كلمة المرور غير صحيحة، حاول مرة أخرى.</p>
+            <% end %>
+            <button type="submit" class="btn-login">دخول</button>
+        </form>
+        <div class="login-footer">
+            <span>Alameer Software &copy; 2025</span>
+        </div>
+    </div>
+</body>
+</html>

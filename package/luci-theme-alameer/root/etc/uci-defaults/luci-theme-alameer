@@ -1,0 +1,7 @@
+#!/bin/sh
+uci batch <<-EOF
+    set luci.themes.Alameer=/luci-static/alameer
+    set luci.main.mediaurlbase=/luci-static/alameer
+    commit luci
+EOF
+exit 0
