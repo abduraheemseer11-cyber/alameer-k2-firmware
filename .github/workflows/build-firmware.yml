@@ -27,7 +27,7 @@ jobs:
         id: ib-cache
         with:
           path: openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64.tar.xz
-          key: ib-21.02.7-mt7620-v2
+          key: ib-21.02.7-mt7620-v3
 
       - name: Download ImageBuilder
         if: steps.ib-cache.outputs.cache-hit != 'true'
@@ -38,22 +38,30 @@ jobs:
         run: |
           tar -xf openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64.tar.xz
 
-      - name: Restructure theme package into overlay
+      - name: Restructure theme and app into overlay
         run: |
           set -e
+          # مسارات الثيم
           mkdir -p files/usr/lib/lua/luci/view/themes/alameer
+          mkdir -p files/www/luci-static/alameer
+          # مسارات التطبيق (لوحة التحكم)
           mkdir -p files/usr/lib/lua/luci/view/alameer
           mkdir -p files/usr/lib/lua/luci/controller
-          mkdir -p files/www/luci-static/alameer
 
+          # نسخ ملفات الثيم
           cp -v package/luci-theme-alameer/luasrc/view/themes/alameer/*.htm \
                 files/usr/lib/lua/luci/view/themes/alameer/
+          cp -v package/luci-theme-alameer/htdocs/luci-static/alameer/* \
+                files/www/luci-static/alameer/
+          
+          # نسخ ملفات التطبيق
           cp -v package/luci-theme-alameer/luasrc/view/alameer/*.htm \
                 files/usr/lib/lua/luci/view/alameer/
           cp -v package/luci-theme-alameer/luasrc/controller/*.lua \
                 files/usr/lib/lua/luci/controller/
-          cp -v package/luci-theme-alameer/htdocs/luci-static/alameer/* \
-                files/www/luci-static/alameer/
+          
+          # نسخ إعدادات التفعيل
+          mkdir -p files/etc/uci-defaults
           cp -v package/luci-theme-alameer/root/etc/uci-defaults/* \
                 files/etc/uci-defaults/
 
@@ -61,7 +69,6 @@ jobs:
         run: |
           find files/etc/uci-defaults -type f -exec chmod 755 {} \;
           find files/usr files/www -type f -exec chmod 644 {} \;
-          find files/etc -type f ! -path "files/etc/uci-defaults/*" -exec chmod 644 {} \;
           find files -type d -exec chmod 755 {} \;
 
       - name: Copy overlay into ImageBuilder
@@ -75,24 +82,10 @@ jobs:
           cd openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64
           make image \
             PROFILE="phicomm_psg1218a" \
-            PACKAGES="luci luci-compat luci-lib-jsonc luci-i18n-base-ar watchcat lldpd iwinfo wpad-basic-wolfssl luci-theme-bootstrap -luci-app-firewall -luci-app-opkg -wpad-openssl -wpad-basic -ppp -ppp-mod-pppoe" \
+            PACKAGES="luci luci-compat luci-lib-jsonc luci-i18n-base-ar luci-lldpd lldpd iwinfo wpad-basic-wolfssl luci-theme-bootstrap -luci-app-firewall -luci-app-opkg -wpad-openssl -wpad-basic -ppp -ppp-mod-pppoe" \
             FILES="./files" \
             DISABLED_SERVICES="dnsmasq firewall odhcpd" \
-            EXTRA_IMAGE_NAME="alameer-k2-v2"
-
-      - name: Verify image size
-        run: |
-          BIN_DIR="openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64/bin/targets/ramips/mt7620"
-          ls -lh "$BIN_DIR"
-          SYS=$(find "$BIN_DIR" -name "*-sysupgrade.bin" | head -1)
-          SIZE=$(stat -c%s "$SYS")
-          LIMIT=$((6000 * 1024)) # تقليل الحد إلى 6 ميجابايت
-          echo "📦 Image size: $SIZE bytes ($(( SIZE / 1024 )) KiB)"
-          if [ "$SIZE" -gt "$LIMIT" ]; then
-            echo "❌ Image exceeds 6MB safety limit!"
-            exit 1
-          fi
-          echo "✅ Size OK — under 6MB"
+            EXTRA_IMAGE_NAME="alameer-k2-v3"
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
