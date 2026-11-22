@@ -44,7 +44,9 @@ iwinfo
 
 # K2 dual-band wireless drivers and WPA2 support
 kmod-rt2800-soc
-kmod-mt76x2
+# kmod-mt76x2
+kmod-mt76-core
+kmod-mt76x2-common
 wpad-basic-mbedtls
 
 # AP / bridge / neighbor discovery utilities
