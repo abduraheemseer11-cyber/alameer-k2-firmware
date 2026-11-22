@@ -8,7 +8,7 @@ require("luci.http").prepare_content("text/html")
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alameer Software OS - <%= boardinfo.hostname or "Alameer-K2" %></title>
     <link rel="stylesheet" href="<%=media%>/cascade.css">
-    <!-- تضمين مكتبات LuCI الأساسية لمنع الصفحة البيضاء -->
+    <!-- مكتبات LuCI الأساسية (ضرورية جداً لمنع الصفحة البيضاء) -->
     <script src="<%=resource%>/luci.js"></script>
     <script src="<%=resource%>/cbi.js"></script>
 </head>
@@ -20,7 +20,6 @@ require("luci.http").prepare_content("text/html")
             <span class="brand-text">ALAMEER SOFTWARE</span>
         </div>
         <nav class="alameer-nav">
-            <!-- إضافة روابط التنقل الأساسية لمنع التعليق -->
             <a href="/cgi-bin/luci/admin/status/alameer">لوحة التحكم</a>
             <a href="/cgi-bin/luci/admin/network/wireless">الواي فاي</a>
             <a href="/cgi-bin/luci/admin/status/overview">الحالة</a>
