@@ -1,0 +1,8 @@
+#!/bin/sh
+mkdir -p /etc/crontabs
+touch /etc/crontabs/root
+grep -q 'alameer-drop-caches' /etc/crontabs/root || echo '30 3 * * * /usr/bin/alameer-drop-caches' >> /etc/crontabs/root
+grep -q 'reboot' /etc/crontabs/root || echo '0 4 * * * /sbin/reboot' >> /etc/crontabs/root
+/etc/init.d/cron enable
+/etc/init.d/cron restart
+exit 0
