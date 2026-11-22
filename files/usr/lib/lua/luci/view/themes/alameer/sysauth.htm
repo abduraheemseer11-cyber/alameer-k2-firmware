@@ -1,0 +1,11 @@
+<%+header%>
+<form method="post" action="<%=pcdata(FULL_REQUEST_URI)%>" class="login-box">
+	<img src="<%=media%>/logo-120.png" width="120" height="120" alt="ALAMEER SOFTWARE">
+	<h2>ALAMEER SOFTWARE</h2>
+	<% if fuser then %><div class="alert-error"><%:Invalid username and/or password! Please try again.%></div><% end %>
+	<input type="hidden" name="luci_username" value="root">
+	<label><%:Password%></label>
+	<input class="cbi-input-password" type="password" name="luci_password" autofocus>
+	<button type="submit" class="cbi-button cbi-button-save"><%:Login%></button>
+</form>
+<%+footer%>
