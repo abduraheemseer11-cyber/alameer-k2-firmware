@@ -8,14 +8,14 @@ MAX_IMAGE_BYTES=$((7 * 1024 * 1024))
 [[ -d "$IB_DIR" ]] || { echo "ERROR: Missing ImageBuilder directory: $IB_DIR" >&2; exit 1; }
 [[ -f packages.txt && -d files ]] || { echo "ERROR: Run from project root." >&2; exit 1; }
 
-mapfile -t PACKAGES < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' packages.txt | xargs -n1)
+mapfile -t PACKAGES < <(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' packages.txt | xargs -r -n1)
 mkdir -p output
 make -C "$IB_DIR" image PROFILE="$PROFILE" PACKAGES="${PACKAGES[*]}" FILES="$PWD/files" BIN_DIR="$PWD/output"
 
 MANIFEST="$(find output -maxdepth 1 -type f -name "*${PROFILE}*.manifest" -print -quit)"
 [[ -n "$MANIFEST" ]] || MANIFEST="$(find output -maxdepth 1 -type f -name '*.manifest' -print -quit)"
 [[ -n "$MANIFEST" ]] || { echo "ERROR: ImageBuilder did not produce a manifest." >&2; exit 1; }
-cp "$MANIFEST" output/firmware.manifest
+[[ "$MANIFEST" == "output/firmware.manifest" ]] || cp "$MANIFEST" output/firmware.manifest
 
 FORBIDDEN='^(dropbear|dnsmasq(-full)?|odhcpd(-[^[:space:]]*)?|odhcp6c|unbound|uhttpd-mod-tls|luci(-[^[:space:]]*)?|rpcd-mod-luci|firewall4?|nftables|iptables|ppp(-[^[:space:]]*)?|libustream-[^[:space:]]*)($|[[:space:]])'
 if grep -Eq "$FORBIDDEN" output/firmware.manifest; then
@@ -38,4 +38,5 @@ for image in "${IMAGES[@]}"; do
   fi
   echo "PASS: $(basename "$image") size=$size bytes"
 done
-sha256sum output/* > output/SHA256SUMS
+
+find output -maxdepth 1 -type f ! -name 'SHA256SUMS' -print0 | sort -z | xargs -0 sha256sum > output/SHA256SUMS
