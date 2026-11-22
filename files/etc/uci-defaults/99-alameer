@@ -1,0 +1,76 @@
+#!/bin/sh
+# ALAMEER SOFTWARE - first-boot defaults  (edit the values below, then rebuild)
+HOSTNAME="ALAMEER-SOFTWARE"
+LAN_IP="192.168.1.20"; LAN_MASK="255.255.255.0"
+SSID_2G="AbduRaheem_2G"; CH_2G="6";  HT_2G="HT20";   TX_2G="20"
+SSID_5G="AbduRaheem_5G"; CH_5G="36"; HT_5G="VHT40";  TX_5G="23"
+COUNTRY="US"
+TZ="AST-3"; ZONE="Asia/Aden"
+
+# ---- system ----
+uci set system.@system[0].hostname="$HOSTNAME"
+uci set system.@system[0].timezone="$TZ"
+uci set system.@system[0].zonename="$ZONE"
+uci commit system
+
+# ---- network: LAN only, static, no WAN/WAN6, no IPv6 ----
+uci -q delete network.wan
+uci -q delete network.wan6
+uci -q delete network.globals.ula_prefix
+uci set network.lan.proto='static'
+uci set network.lan.ipaddr="$LAN_IP"
+uci set network.lan.netmask="$LAN_MASK"
+uci -q delete network.lan.ip6assign
+uci commit network
+
+# ---- DHCP permanently off (transparent bridge) ----
+[ -f /etc/config/dhcp ] || touch /etc/config/dhcp
+uci -q delete dhcp.lan
+uci set dhcp.lan=dhcp
+uci set dhcp.lan.interface='lan'
+uci set dhcp.lan.ignore='1'
+uci set dhcp.lan.dhcpv6='disabled'
+uci set dhcp.lan.ra='disabled'
+uci commit dhcp
+
+# ---- Wi-Fi: both bands on, open ----
+[ -s /etc/config/wireless ] || wifi detect > /etc/config/wireless 2>/dev/null
+for r in $(uci show wireless | sed -n "s/^wireless\.\(radio[0-9]*\)=wifi-device/\1/p"); do
+  hw="$(uci -q get wireless.$r.hwmode)"; band="$(uci -q get wireless.$r.band)"
+  if [ "$hw" = "11a" ] || [ "$band" = "5g" ]; then
+    S="$SSID_5G"; C="$CH_5G"; H="$HT_5G"; X="$TX_5G"
+  else
+    S="$SSID_2G"; C="$CH_2G"; H="$HT_2G"; X="$TX_2G"
+  fi
+  uci set wireless.$r.disabled='0'
+  uci set wireless.$r.country="$COUNTRY"
+  uci set wireless.$r.channel="$C"
+  uci set wireless.$r.htmode="$H"
+  uci set wireless.$r.txpower="$X"
+  # replace any auto-generated iface for this radio with ours
+  for i in $(uci show wireless | sed -n "s/^wireless\.\(@wifi-iface\[[0-9]*\]\)\.device='$r'/\1/p" | sort -r); do uci -q delete wireless.$i; done
+  uci set wireless.default_$r=wifi-iface
+  uci set wireless.default_$r.device="$r"
+  uci set wireless.default_$r.network='lan'
+  uci set wireless.default_$r.mode='ap'
+  uci set wireless.default_$r.ssid="$S"
+  uci set wireless.default_$r.encryption='none'
+done
+uci commit wireless
+
+# ---- web: HTTP port 80 only, no HTTPS ----
+uci -q delete uhttpd.main.listen_https
+uci set uhttpd.main.listen_http='0.0.0.0:80'
+uci -q delete uhttpd.main.redirect_https
+uci commit uhttpd
+
+# ---- LuCI theme + default language ----
+uci set luci.main.mediaurlbase='/luci-static/alameer'
+uci set luci.themes.Alameer='/luci-static/alameer'
+uci set luci.main.lang='ar'
+uci commit luci
+
+# ---- no SSH ----
+/etc/init.d/dropbear disable 2>/dev/null
+/etc/init.d/dropbear stop 2>/dev/null
+exit 0
