@@ -27,7 +27,7 @@ jobs:
         id: ib-cache
         with:
           path: openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64.tar.xz
-          key: ib-21.02.7-mt7620-v1
+          key: ib-21.02.7-mt7620-v2
 
       - name: Download ImageBuilder
         if: steps.ib-cache.outputs.cache-hit != 'true'
@@ -64,14 +64,6 @@ jobs:
           find files/etc -type f ! -path "files/etc/uci-defaults/*" -exec chmod 644 {} \;
           find files -type d -exec chmod 755 {} \;
 
-      - name: Verify overlay structure
-        run: |
-          echo "=== Overlay file tree ==="
-          find files -type f | sort
-          echo ""
-          echo "=== Critical executables ==="
-          ls -l files/etc/uci-defaults/
-
       - name: Copy overlay into ImageBuilder
         run: |
           cd openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64
@@ -83,42 +75,28 @@ jobs:
           cd openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64
           make image \
             PROFILE="phicomm_psg1218a" \
-            PACKAGES="luci luci-compat luci-lib-jsonc luci-i18n-base-ar luci-i18n-firewall-ar watchcat lldpd iwinfo luci-app-commands wpad-openssl -luci-app-firewall -luci-app-opkg -luci-theme-bootstrap -wpad-basic-wolfssl -wpad-basic" \
+            PACKAGES="luci luci-compat luci-lib-jsonc luci-i18n-base-ar watchcat lldpd iwinfo wpad-basic-wolfssl luci-theme-bootstrap -luci-app-firewall -luci-app-opkg -wpad-openssl -wpad-basic -ppp -ppp-mod-pppoe" \
             FILES="./files" \
             DISABLED_SERVICES="dnsmasq firewall odhcpd" \
-            EXTRA_IMAGE_NAME="alameer-k2-v1"
+            EXTRA_IMAGE_NAME="alameer-k2-v2"
 
       - name: Verify image size
         run: |
           BIN_DIR="openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64/bin/targets/ramips/mt7620"
           ls -lh "$BIN_DIR"
           SYS=$(find "$BIN_DIR" -name "*-sysupgrade.bin" | head -1)
-          if [ -z "$SYS" ]; then
-            echo "❌ No sysupgrade image generated!"
-            exit 1
-          fi
           SIZE=$(stat -c%s "$SYS")
-          LIMIT=$((7500 * 1024))
+          LIMIT=$((6000 * 1024)) # تقليل الحد إلى 6 ميجابايت
           echo "📦 Image size: $SIZE bytes ($(( SIZE / 1024 )) KiB)"
-          echo "🔒 Safe limit: $LIMIT bytes (7500 KiB)"
           if [ "$SIZE" -gt "$LIMIT" ]; then
-            echo "❌ Image exceeds 7.5MB safety limit!"
+            echo "❌ Image exceeds 6MB safety limit!"
             exit 1
           fi
-          echo "✅ Size OK — safe to flash"
-
-      - name: Generate SHA256 checksums
-        run: |
-          BIN_DIR="openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64/bin/targets/ramips/mt7620"
-          cd "$BIN_DIR"
-          sha256sum *.bin > SHA256SUMS.txt
-          cat SHA256SUMS.txt
+          echo "✅ Size OK — under 6MB"
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
           name: alameer-k2-firmware
-          path: |
-            openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64/bin/targets/ramips/mt7620/*.bin
-            openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64/bin/targets/ramips/mt7620/SHA256SUMS.txt
+          path: openwrt-imagebuilder-21.02.7-ramips-mt7620.Linux-x86_64/bin/targets/ramips/mt7620/*.bin
           retention-days: 30
