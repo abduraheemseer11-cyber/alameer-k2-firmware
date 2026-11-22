@@ -44,8 +44,11 @@ jobs:
           tar -tJf "$IB_ARCHIVE" >/dev/null
           tar -xf "$IB_ARCHIVE"
 
+      - name: Ensure build script is executable
+        run: chmod +x build.sh
+
       - name: Build custom firmware
-        run: ./build.sh
+        run: bash ./build.sh
 
       - name: Verify firmware, manifest, and size policy
         run: |
@@ -70,3 +73,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: output/*
+          fail_on_unmatched_files: false
