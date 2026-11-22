@@ -8,7 +8,6 @@ require("luci.http").prepare_content("text/html")
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسجيل الدخول - Alameer Software OS</title>
     <link rel="stylesheet" href="<%=media%>/cascade.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="alameer-login-body">
     <div class="login-card">
@@ -18,6 +17,8 @@ require("luci.http").prepare_content("text/html")
         <h2>مرحباً بك في Alameer Software OS</h2>
         <p class="login-sub">أدخل كلمة المرور للمتابعة</p>
         <form method="post" action="<%=REQUEST_URI%>">
+            <!-- هذا الحقل إجباري لكي يتعرف LuCI على المستخدم -->
+            <input type="hidden" name="luci_username" value="root" />
             <div class="input-group">
                 <label for="luci_password">كلمة المرور</label>
                 <input type="password" id="luci_password" name="luci_password" placeholder="••••••••" required>
