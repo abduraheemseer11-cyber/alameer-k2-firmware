@@ -1,4 +1,0 @@
-#!/bin/sh
-# Drop only reclaimable page cache; never clear slab or kill processes.
-sync
-echo 1 > /proc/sys/vm/drop_caches
