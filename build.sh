@@ -17,7 +17,8 @@ tar -xJf ib.tar.xz
 cd "$IB"
 
 PACKAGES="$(grep -v '^\s*#' "$ROOT/packages.txt" | tr '\n' ' ')"
-make image PROFILE="$PROFILE" PACKAGES="$PACKAGES" FILES="$ROOT/files" EXTRA_IMAGE_NAME="alameer"
+# 19.07 prereq check asks for Python 2 (not available on ubuntu-22.04); not needed for ImageBuilder -> FORCE=1
+make image FORCE=1 PROFILE="$PROFILE" PACKAGES="$PACKAGES" FILES="$ROOT/files" EXTRA_IMAGE_NAME="alameer"
 
 BIN="$(ls bin/targets/ramips/mt7620/*${PROFILE}*sysupgrade.bin | head -n1)"
 SIZE=$(stat -c%s "$BIN")
