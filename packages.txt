@@ -1,0 +1,18 @@
+# One package per line. A leading "-" removes a package from the default set.
+luci-base
+luci-mod-network
+luci-mod-status
+luci-mod-system
+luci-i18n-base-ar
+uhttpd
+# --- removed to save space / disable features ---
+-ppp
+-ppp-mod-pppoe
+-kmod-ppp
+-kmod-pppoe
+-kmod-pppox
+-odhcp6c
+-odhcpd-ipv6only
+-ip6tables
+-kmod-ip6tables
+-dnsmasq
