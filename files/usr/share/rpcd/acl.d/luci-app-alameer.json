@@ -1,0 +1,17 @@
+{
+	"luci-app-alameer": {
+		"description": "Grant access to Alameer tools",
+		"read": {
+			"ubus": {
+				"alameer": [ "survey", "sysinfo", "loopstatus", "ports", "capabilities" ],
+				"iwinfo": [ "scan", "freqlist", "info" ],
+				"network.wireless": [ "status" ]
+			},
+			"uci": [ "alameer", "wireless", "network", "dhcp" ]
+		},
+		"write": {
+			"ubus": { "alameer": [ "set_cpu" ] },
+			"uci": [ "alameer", "wireless", "network", "dhcp" ]
+		}
+	}
+}

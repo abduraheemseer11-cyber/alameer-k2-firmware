@@ -1,0 +1,116 @@
+#!/bin/sh
+# Alameer loop / broadcast-storm guard (user-space; samples bridge member counters).
+. /lib/functions.sh
+
+BR=br-lan
+RUN=/var/run/alameer-lg
+STATUS=/var/run/alameer-loopguard.json
+EVENTS=/var/run/alameer-loopguard.events
+mkdir -p "$RUN"; : > "$EVENTS"
+
+load_cfg() {
+	config_load alameer
+	config_get_bool ENABLED loopguard enabled 1
+	config_get STORM    loopguard storm_pps 30000
+	config_get MCSTORM  loopguard mc_pps 1500
+	config_get WINDOW   loopguard window 3
+	config_get ACTION   loopguard action down
+	config_get LOCKOUT  loopguard lockout 60
+	config_get INTERVAL loopguard interval 1
+	config_get UPLINK   loopguard uplink ""
+	config_get LOGTHR   loopguard log_threshold 5
+}
+
+event() { # port reason action
+	echo "$(cut -d. -f1 /proc/uptime)|$1|$2|$3" >> "$EVENTS"
+	tail -n 20 "$EVENTS" > "$EVENTS.t" && mv "$EVENTS.t" "$EVENTS"
+	logger -t alameer-loopguard "port=$1 reason=$2 action=$3"
+}
+
+in_list() { local x; for x in $2; do [ "$x" = "$1" ] && return 0; done; return 1; }
+num() { case "$1" in ''|*[!0-9]*) echo "${2:-0}" ;; *) echo "$1" ;; esac; }
+rd()  { num "$(cat "$1" 2>/dev/null)" 0; }
+
+react() { # port reason
+	local p="$1" why="$2" now
+	now="$(cut -d. -f1 /proc/uptime)"
+	[ -e "$RUN/$p.lock" ] && return
+	if [ "$ACTION" = "down" ] && ! in_list "$p" "$UPLINK"; then
+		ip link set dev "$p" down 2>/dev/null
+		echo $((now + LOCKOUT)) > "$RUN/$p.lock"
+		event "$p" "$why" "isolated ${LOCKOUT}s"
+	else
+		event "$p" "$why" "warning"
+	fi
+}
+
+write_status() {
+	local state="$1" ports="$2"
+	{
+		printf '{"running":true,"state":"%s","storm_pps":%s,"mc_pps":%s,"ports":[%s],"events":[' "$state" "$STORM" "$MCSTORM" "$ports"
+		awk -F'|' '{printf "%s{\"time\":%d,\"port\":\"%s\",\"reason\":\"%s\",\"action\":\"%s\"}", (NR>1?",":""), $1, $2, $3, $4}' "$EVENTS"
+		printf ']}\n'
+	} > "$STATUS.t" && mv "$STATUS.t" "$STATUS"
+}
+
+LOGCNT=0; TICK=0
+while :; do
+	load_cfg
+	INTERVAL="$(num "$INTERVAL" 1)"; [ "$INTERVAL" -ge 1 ] || INTERVAL=1
+	WINDOW="$(num "$WINDOW" 3)"; LOCKOUT="$(num "$LOCKOUT" 60)"
+	STORM="$(num "$STORM" 30000)"; MCSTORM="$(num "$MCSTORM" 1500)"
+	if [ "$ENABLED" != 1 ]; then write_status disabled ""; sleep 5; continue; fi
+	if [ ! -d "/sys/class/net/$BR/brif" ]; then sleep 3; continue; fi
+	now="$(cut -d. -f1 /proc/uptime)"
+	plist=""; state="ok"
+	for d in /sys/class/net/$BR/brif/*; do
+		[ -e "$d" ] || continue
+		p="${d##*/}"
+		# release isolated ports when the lockout expires
+		if [ -e "$RUN/$p.lock" ]; then
+			until="$(rd "$RUN/$p.lock")"
+			if [ "$now" -ge "$until" ]; then
+				ip link set dev "$p" up 2>/dev/null; rm -f "$RUN/$p.lock" "$RUN/$p.rx" "$RUN/$p.mc" "$RUN/$p.bad"
+				event "$p" "lockout expired" "restored"
+			else
+				state="isolating"
+				plist="$plist${plist:+,}{\"name\":\"$p\",\"rx_pps\":0,\"mc_pps\":0,\"state\":\"isolated\"}"
+				continue
+			fi
+		fi
+		rx="$(rd /sys/class/net/$p/statistics/rx_packets)"
+		mc="$(rd /sys/class/net/$p/statistics/multicast)"
+		prx="$(rd "$RUN/$p.rx")"; [ -e "$RUN/$p.rx" ] || prx="$rx"
+		pmc="$(rd "$RUN/$p.mc")"; [ -e "$RUN/$p.mc" ] || pmc="$mc"
+		echo "$rx" > "$RUN/$p.rx"; echo "$mc" > "$RUN/$p.mc"
+		drx=$((rx - prx)); [ "$drx" -lt 0 ] && drx=0
+		dmc=$((mc - pmc)); [ "$dmc" -lt 0 ] && dmc=0
+		rxpps=$((drx / INTERVAL)); mcpps=$((dmc / INTERVAL))
+		bad="$(rd "$RUN/$p.bad")"
+		pstate="ok"
+		if [ "$rxpps" -ge "$STORM" ] || [ "$mcpps" -ge "$MCSTORM" ]; then
+			bad=$((bad + 1)); pstate="high"
+		else
+			bad=0
+		fi
+		echo "$bad" > "$RUN/$p.bad"
+		if [ "$bad" -ge "$WINDOW" ]; then
+			react "$p" "storm rx=${rxpps}pps mc=${mcpps}pps"
+			echo 0 > "$RUN/$p.bad"; state="storm"; pstate="storm"
+		fi
+		plist="$plist${plist:+,}{\"name\":\"$p\",\"rx_pps\":$rxpps,\"mc_pps\":$mcpps,\"state\":\"$pstate\"}"
+	done
+	# kernel bridge hint: frames carrying the bridge's own MAC as source = loop
+	TICK=$((TICK + 1))
+	if [ $((TICK % 5)) -eq 0 ]; then
+		cnt="$(dmesg 2>/dev/null | grep -c 'own address as source address')"
+		if [ "$cnt" -gt "$LOGCNT" ] && [ $((cnt - LOGCNT)) -ge "$LOGTHR" ]; then
+			sp="$(dmesg | grep 'own address as source address' | tail -n1 | sed -n 's/.*received packet on \([^ ]*\) with.*/\1/p')"
+			[ -n "$sp" ] && [ -d "/sys/class/net/$BR/brif/$sp" ] && react "$sp" "own-MAC frames (loop)" || event "?" "own-MAC frames (loop)" "warning"
+			state="loop"
+		fi
+		LOGCNT="$cnt"
+	fi
+	write_status "$state" "$plist"
+	sleep "$INTERVAL"
+done

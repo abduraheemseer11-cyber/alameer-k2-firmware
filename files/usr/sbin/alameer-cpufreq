@@ -1,0 +1,27 @@
+#!/bin/sh
+# Applies saved CPU frequency policy; runs the auto governor loop when requested.
+. /lib/functions.sh
+CPUF=/sys/devices/system/cpu/cpu0/cpufreq
+[ -r "$CPUF/scaling_governor" ] || { logger -t alameer-cpufreq "cpufreq not supported on this SoC/kernel; nothing to do"; exit 0; }
+config_load alameer
+config_get MODE cpu mode static
+config_get GOV cpu governor ""
+config_get MAX cpu max_freq ""
+config_get MIN cpu min_freq ""
+config_get HI cpu load_high 70
+config_get LO cpu load_low 25
+config_get AVAIL_G cpu x ""
+setall() { for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do echo "$2" > "$c/$1" 2>/dev/null; done; }
+[ -n "$MAX" ] && setall scaling_max_freq "$MAX"
+[ -n "$MIN" ] && setall scaling_min_freq "$MIN"
+[ "$MODE" = static ] && { [ -n "$GOV" ] && setall scaling_governor "$GOV"; exit 0; }
+# auto: switch governor based on 1-minute load (percentage of one core)
+has() { grep -qw "$1" $CPUF/scaling_available_governors; }
+while :; do
+	l="$(cut -d' ' -f1 /proc/loadavg | tr -d .)"   # 0.35 -> 035
+	l=${l#"${l%%[!0]*}"}; l=${l:-0}
+	if [ "$l" -ge "$HI" ]; then has performance && setall scaling_governor performance
+	elif [ "$l" -le "$LO" ]; then has powersave && setall scaling_governor powersave || { has conservative && setall scaling_governor conservative; }
+	fi
+	sleep 5
+done

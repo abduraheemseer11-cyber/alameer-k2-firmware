@@ -1,0 +1,51 @@
+#!/bin/sh
+# Read-only capability report for TP-Link RE205 v3 / OpenWrt.
+set -u
+echo "AlMakhdhi RE205 capability report"
+echo "================================="
+echo
+echo "[CPU frequency scaling]"
+if [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
+  for f in scaling_driver scaling_governor scaling_available_governors cpuinfo_min_freq cpuinfo_max_freq scaling_cur_freq; do
+    [ -r "/sys/devices/system/cpu/cpu0/cpufreq/$f" ] && printf '%s: %s\n' "$f" "$(cat "/sys/devices/system/cpu/cpu0/cpufreq/$f")"
+  done
+else
+  echo "Not exposed by the running kernel/device tree."
+fi
+echo
+echo "[Thermal sensors]"
+found=0
+for f in /sys/class/thermal/thermal_zone*/temp; do
+  [ -r "$f" ] || continue
+  found=1
+  printf '%s: %s\n' "$f" "$(cat "$f")"
+done
+[ "$found" -eq 1 ] || echo "No thermal zone exposed."
+echo
+echo "[Wireless survey support]"
+if command -v iw >/dev/null 2>&1; then
+  iw dev 2>/dev/null | awk '$1=="Interface"{print "Interface: "$2}'
+  for phy in /sys/class/ieee80211/phy*; do
+    [ -e "$phy" ] || continue
+    p=${phy##*/}
+    echo "$p:"
+    iw phy "$p" info 2>/dev/null | grep -E 'Frequencies:|MHz|survey' | head -n 18 || true
+  done
+  echo "Survey counters (if driver supports them):"
+  iw dev 2>/dev/null | awk '$1=="Interface"{print $2}' | while read -r iface; do
+    echo "-- $iface --"
+    iw dev "$iface" survey dump 2>&1 | head -n 30
+  done
+else
+  echo "iw is not installed."
+fi
+echo
+echo "[Bridge loop prevention]"
+if command -v bridge >/dev/null 2>&1; then
+  bridge -d link show 2>/dev/null | grep -E 'state|stp' || true
+else
+  echo "ip-bridge/bridge utility is not installed."
+fi
+echo
+echo "This report is read-only. It does not unlock channels, change transmit power,"
+echo "change CPU clocks, or enable bridge STP."

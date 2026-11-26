@@ -1,0 +1,121 @@
+#!/bin/sh
+# rpcd plugin "alameer": survey / sysinfo / cpu control / loop-guard status / capabilities
+. /usr/share/libubox/jshn.sh
+
+validdev() { case "$1" in ''|*[!A-Za-z0-9_.-]*) return 1 ;; esac; return 0; }
+isnum()    { case "$1" in ''|*[!0-9]*) return 1 ;; esac; return 0; }
+CPUF=/sys/devices/system/cpu/cpu0/cpufreq
+
+reply_err() { json_init; json_add_boolean ok 0; json_add_string error "$1"; json_dump; }
+
+do_survey() {
+	local dev="$1"
+	validdev "$dev" || { echo '{"channels":[],"error":"bad device"}'; return; }
+	command -v iw >/dev/null 2>&1 || { echo '{"channels":[],"error":"iw not installed"}'; return; }
+	iw dev "$dev" survey dump 2>/dev/null | awk '
+	function flush() { if (f != "") printf "%s{\"freq\":%d,\"noise\":%s,\"active\":%d,\"busy\":%d,\"in_use\":%s}", (n++ ? "," : ""), f, (noise == "" ? "null" : noise), act, busy, inuse; f = ""; noise = ""; act = 0; busy = 0; inuse = "false" }
+	BEGIN { printf "{\"channels\":["; n = 0; f = ""; act = 0; busy = 0; inuse = "false" }
+	/frequency:/ { flush(); f = $2; if ($0 ~ /in use/) inuse = "true" }
+	/noise:/ { noise = $2 }
+	/channel active time:/ { act = $4 }
+	/channel busy time:/ { busy = $4 }
+	END { flush(); print "]}" }'
+}
+
+do_sysinfo() {
+	local model soc load mem_t mem_f up temp cnt
+	model="$(cat /tmp/sysinfo/model 2>/dev/null)"
+	soc="$(sed -n 's/^system type[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n1)"
+	json_init
+	json_add_string model "$model"
+	json_add_string soc "$soc"
+	json_add_string load "$(cut -d' ' -f1-3 /proc/loadavg)"
+	mem_t="$(sed -n 's/^MemTotal:[[:space:]]*\([0-9]*\).*/\1/p' /proc/meminfo)"
+	mem_f="$(sed -n 's/^MemAvailable:[[:space:]]*\([0-9]*\).*/\1/p' /proc/meminfo)"
+	json_add_int mem_total_kb "${mem_t:-0}"
+	json_add_int mem_avail_kb "${mem_f:-0}"
+	json_add_int uptime "$(cut -d. -f1 /proc/uptime)"
+	temp=""
+	for z in /sys/class/thermal/thermal_zone*/temp; do
+		[ -r "$z" ] && { temp="$(cat "$z" 2>/dev/null)"; break; }
+	done
+	if isnum "$temp"; then json_add_int temp_mc "$temp"; fi
+	case "$soc" in
+		*MT7628*|*MT7688*) json_add_int fixed_mhz 580 ;;
+	esac
+	json_add_object cpufreq
+	if [ -r "$CPUF/scaling_governor" ]; then
+		json_add_boolean supported 1
+		json_add_string governor "$(cat $CPUF/scaling_governor)"
+		json_add_string governors "$(cat $CPUF/scaling_available_governors 2>/dev/null)"
+		json_add_string frequencies "$(cat $CPUF/scaling_available_frequencies 2>/dev/null)"
+		json_add_string cur_khz "$(cat $CPUF/scaling_cur_freq 2>/dev/null)"
+		json_add_string min_khz "$(cat $CPUF/scaling_min_freq 2>/dev/null)"
+		json_add_string max_khz "$(cat $CPUF/scaling_max_freq 2>/dev/null)"
+		json_add_string hw_min_khz "$(cat $CPUF/cpuinfo_min_freq 2>/dev/null)"
+		json_add_string hw_max_khz "$(cat $CPUF/cpuinfo_max_freq 2>/dev/null)"
+	else
+		json_add_boolean supported 0
+	fi
+	json_close_object
+	json_dump
+}
+
+do_set_cpu() {
+	local gov max min g f ok
+	json_load "$1" 2>/dev/null || { reply_err "bad json"; return; }
+	json_get_var gov governor; json_get_var max max_freq; json_get_var min min_freq
+	[ -r "$CPUF/scaling_governor" ] || { reply_err "cpufreq not supported by this kernel/SoC"; return; }
+	if [ -n "$gov" ]; then
+		ok=0; for g in $(cat $CPUF/scaling_available_governors); do [ "$g" = "$gov" ] && ok=1; done
+		[ "$ok" = 1 ] || { reply_err "governor not available"; return; }
+	fi
+	for f in "$max" "$min"; do
+		[ -z "$f" ] && continue
+		isnum "$f" || { reply_err "bad frequency"; return; }
+		[ "$f" -ge "$(cat $CPUF/cpuinfo_min_freq)" ] && [ "$f" -le "$(cat $CPUF/cpuinfo_max_freq)" ] || { reply_err "frequency out of range"; return; }
+	done
+	for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+		[ -n "$max" ] && echo "$max" > "$c/scaling_max_freq" 2>/dev/null
+		[ -n "$min" ] && echo "$min" > "$c/scaling_min_freq" 2>/dev/null
+		[ -n "$gov" ] && echo "$gov" > "$c/scaling_governor" 2>/dev/null
+	done
+	( /etc/init.d/alameer-cpufreq restart >/dev/null 2>&1 & )
+	json_init; json_add_boolean ok 1; json_dump
+}
+
+do_ports() {
+	local d
+	json_init; json_add_array ports
+	for d in /sys/class/net/br-lan/brif/*; do
+		[ -e "$d" ] || continue
+		json_add_string "" "${d##*/}"
+	done
+	json_close_array; json_dump
+}
+
+do_caps() {
+	json_init
+	command -v iw >/dev/null 2>&1 && json_add_boolean iw 1 || json_add_boolean iw 0
+	[ -x /usr/sbin/relayd ] && json_add_boolean relayd 1 || json_add_boolean relayd 0
+	ls /lib/modules/*/batman-adv.ko >/dev/null 2>&1 && json_add_boolean batman 1 || json_add_boolean batman 0
+	ls /usr/lib/opkg/info/wpad-mesh*.control >/dev/null 2>&1 && json_add_boolean mesh_wpad 1 || json_add_boolean mesh_wpad 0
+	[ -r "$CPUF/scaling_governor" ] && json_add_boolean cpufreq 1 || json_add_boolean cpufreq 0
+	json_dump
+}
+
+case "$1" in
+list)
+	echo '{"survey":{"device":"str"},"sysinfo":{},"set_cpu":{"governor":"str","max_freq":"str","min_freq":"str"},"loopstatus":{},"ports":{},"capabilities":{}}'
+	;;
+call)
+	case "$2" in
+	survey)     read -r input; json_load "$input" 2>/dev/null; json_get_var dev device; do_survey "$dev" ;;
+	sysinfo)    do_sysinfo ;;
+	set_cpu)    read -r input; do_set_cpu "$input" ;;
+	loopstatus) cat /var/run/alameer-loopguard.json 2>/dev/null || echo '{"running":false,"ports":[],"events":[]}' ;;
+	ports)      do_ports ;;
+	capabilities) do_caps ;;
+	esac
+	;;
+esac
