@@ -15,7 +15,6 @@ env:
   SUBTARGET: "mt7620"
   PROFILE: "phicomm_k2"
   MAX_IMAGE_BYTES: "7500000"
-  # Experimental: build a custom regulatory.db containing country "ZZ" (see README).
   SUPER_REGDB: "false"
 
 jobs:
@@ -51,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           IB="openwrt-imagebuilder-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}.Linux-x86_64"
-          URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/${IB}.tar.zst"
+          URL="https://openwrt.org{OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/${IB}.tar.zst"
           curl --fail --location --retry 3 "$URL" -o imagebuilder.tar.zst
           mkdir imagebuilder
           tar --use-compress-program=unzstd -xf imagebuilder.tar.zst -C imagebuilder --strip-components=1
@@ -77,10 +76,12 @@ jobs:
               gzip -dc "$source" > "$payload"
             fi
 
-            if ar t "$payload" >/tmp/alameer-ar-members.txt 2>/dev/null               && grep -Eq '(^|/)debian-binary$' /tmp/alameer-ar-members.txt; then
+            if ar t "$payload" >/tmp/alameer-ar-members.txt 2>/dev/null \
+              && grep -Eq '(^|/)debian-binary$' /tmp/alameer-ar-members.txt; then
               echo "Recognized Debian ar/IPK container."
               (cd "$destination" && ar x "$payload")
-            elif tar -tf "$payload" >/tmp/alameer-tar-members.txt 2>/dev/null               && grep -Eq '(^|\./)debian-binary$' /tmp/alameer-tar-members.txt; then
+            elif tar -tf "$payload" >/tmp/alameer-tar-members.txt 2>/dev/null \
+              && grep -Eq '(^|\./)debian-binary$' /tmp/alameer-tar-members.txt; then
               echo "Recognized tar-wrapped IPK container."
               tar -xf "$payload" -C "$destination"
             else
@@ -107,13 +108,12 @@ jobs:
 
           ipk="$(find packages -type f -name 'luci-theme-bootstrap_*.ipk' -print -quit || true)"
           if [ -z "$ipk" ]; then
-            feed="https://downloads.openwrt.org/releases/packages-24.10/mipsel_24kc/luci"
+            feed="https://openwrt.org"
             index=/tmp/alameer-luci-Packages.gz
             ipk=/tmp/luci-theme-bootstrap.ipk
             curl --fail --location --retry 3 --retry-all-errors "$feed/Packages.gz" -o "$index"
             gzip -t "$index"
-            filename="$(gzip -dc "$index" | awk 'BEGIN { RS=""; FS="
-" } $1 == "Package: luci-theme-bootstrap" { for (i=1; i<=NF; i++) if ($i ~ /^Filename: /) { sub(/^Filename: /, "", $i); print $i; exit } }')"
+            filename="$(gzip -dc "$index" | awk 'BEGIN { RS=""; FS="\x0a" } $1 == "Package: luci-theme-bootstrap" { for (i=1; i<=NF; i++) if ($i ~ /^Filename: /) { sub(/^Filename: /, "", $i); print $i; exit } }')"
             if [ -z "$filename" ]; then
               echo "luci-theme-bootstrap was not found in $feed/Packages.gz" >&2
               exit 1
@@ -143,7 +143,9 @@ jobs:
           test -f files/etc/uci-defaults/99-custom-config
           test -f files/usr/bin/alameer-reset-wireless
           test -f "$GITHUB_WORKSPACE/scripts/inject-theme-assets.sh"
-          chmod 0755 files/etc/uci-defaults/99-custom-config files/usr/bin/alameer-reset-wireless             files/usr/libexec/rpcd/alameer files/usr/sbin/alameer-loopguard files/usr/sbin/alameer-cpufreq             files/etc/init.d/alameer-loopguard files/etc/init.d/alameer-cpufreq
+          chmod 0755 files/etc/uci-defaults/99-custom-config files/usr/bin/alameer-reset-wireless \
+            files/usr/libexec/rpcd/alameer files/usr/sbin/alameer-loopguard files/usr/sbin/alameer-cpufreq \
+            files/etc/init.d/alameer-loopguard files/etc/init.d/alameer-cpufreq
 
       - name: Optional custom regulatory database (Super Channel "ZZ")
         if: env.SUPER_REGDB == 'true'
@@ -159,11 +161,8 @@ jobs:
           set -euo pipefail
           cd "$IMAGEBUILDER"
           BASE="luci-base luci-mod-admin-full luci-theme-bootstrap uhttpd uhttpd-mod-ubus ppp ppp-mod-pppoe -odhcpd-ipv6only -ip6tables -kmod-ip6tables -luci-app-firewall"
-          # Tier 1: everything (mesh + extender + watchdog + analyzer tools)
           FULL="$BASE iw relayd kmod-batman-adv -wpad-basic-mbedtls wpad-mesh-mbedtls watchcat luci-app-watchcat"
-          # Tier 2: no mesh (batman-adv/wpad-mesh dropped to save flash)
           LITE="$BASE iw relayd"
-          # Tier 3: analyzer only
           MIN="$BASE iw"
           mkdir -p "$GITHUB_WORKSPACE/dist"
           built=""
@@ -208,25 +207,3 @@ jobs:
               exit 1
             fi
             file "$image"
-          done
-          (cd dist && sha256sum *.bin > SHA256SUMS)
-
-      - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: alameer-openwrt-${{ env.OPENWRT_VERSION }}-${{ env.PROFILE }}
-          path: |
-            dist/*.bin
-            dist/SHA256SUMS
-            dist/BUILD-TIER.txt
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish GitHub Release for version tags
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.bin
-            dist/SHA256SUMS
-          generate_release_notes: true
