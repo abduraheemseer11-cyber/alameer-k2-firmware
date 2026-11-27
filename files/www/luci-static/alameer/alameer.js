@@ -1,6 +1,10 @@
 /* Alameer: replaces LuCI bootstrap nav with fixed top bar + sliding drawer */
 (function () {
 	'use strict';
+	
+	// Skip execution on the login page to prevent layout breakage
+	if (document.body.classList.contains('sysauth') || document.querySelector('form[action*="sysauth"]')) return;
+
 	function collect() {
 		var root = document.querySelector('#mainmenu') || document.querySelector('ul.nav');
 		var groups = [];
