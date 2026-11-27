@@ -21,9 +21,10 @@ rm -rf work/files && cp -a files work/files
 ./scripts/inject-theme-assets.sh work/files "$VER"
 chmod 755 work/files/usr/sbin/* work/files/etc/init.d/* work/files/etc/uci-defaults/* work/files/usr/libexec/rpcd/*
 
+# Removed heavy packages (relayd, watchcat, batman-adv, wpad-mesh)
 BASE="luci-base luci-mod-admin-full luci-theme-bootstrap uhttpd uhttpd-mod-ubus"
-FULL="$BASE iw relayd kmod-batman-adv -wpad-basic-wolfssl wpad-mesh-wolfssl watchcat luci-app-watchcat"
-LITE="$BASE iw relayd watchcat luci-app-watchcat"
+FULL="$BASE iw -wpad-basic-wolfssl wpad-basic-wolfssl"
+LITE="$BASE iw"
 MIN="$BASE iw"
 
 built=0
