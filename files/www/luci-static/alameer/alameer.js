@@ -2,8 +2,11 @@
 (function () {
 	'use strict';
 	
-	// Skip execution on the login page to prevent layout breakage
-	if (document.body.classList.contains('sysauth') || document.querySelector('form[action*="sysauth"]')) return;
+	// Detect login page and add the 'sysauth' class to body for custom styling
+	if (document.querySelector('form[action*="login"]') || document.querySelector('input[name="luci_username"]')) {
+		document.body.classList.add('sysauth');
+		return; // Stop execution on the login page
+	}
 
 	function collect() {
 		var root = document.querySelector('#mainmenu') || document.querySelector('ul.nav');
