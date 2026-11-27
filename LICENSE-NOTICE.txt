@@ -1,1 +1,0 @@
-The OpenWrt firmware and LuCI components retain their respective upstream licenses. The Alameer Software logo was supplied by the user for this project. Custom CSS, JS and configuration scripts in this repository are provided as project materials.
