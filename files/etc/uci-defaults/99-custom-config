@@ -47,6 +47,23 @@ uci -q delete dhcp.lan.start; uci -q delete dhcp.lan.limit
 
 uci commit network; uci commit dhcp; uci commit system; uci commit alameer
 
+# --- Disable unnecessary services to speed up boot & close ports ---
+# Disable SSH (Dropbear)
+/etc/init.d/dropbear disable
+/etc/init.d/dropbear stop 2>/dev/null
+
+# Disable DNS/DHCP Server (Dnsmasq) - Closes port 53 and 67
+/etc/init.d/dnsmasq disable
+/etc/init.d/dnsmasq stop 2>/dev/null
+
+# Disable IPv6 DHCP (Odhcpd)
+/etc/init.d/odhcpd disable
+/etc/init.d/odhcpd stop 2>/dev/null
+
+# Disable Firewall (Not needed in AP mode)
+/etc/init.d/firewall disable
+/etc/init.d/firewall stop 2>/dev/null
+
 # --- Wireless ---
 /usr/sbin/alameer-reset-wireless
 
