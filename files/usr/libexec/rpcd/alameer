@@ -1,0 +1,69 @@
+#!/bin/sh
+# rpcd exec plugin: ubus object "alameer"
+. /usr/share/libubox/jshn.sh
+
+case "$1" in
+list)
+	echo '{"survey":{"radio":"str"},"sysinfo":{},"ports":{},"loopstatus":{}}'
+	;;
+call)
+	read -r input
+	case "$2" in
+	survey)
+		json_load "${input:-{\}}"; json_get_var radio radio
+		[ -z "$radio" ] && radio=radio0
+		ifn=$(ubus call network.wireless status 2>/dev/null | jsonfilter -e "@.$radio.interfaces[0].ifname")
+		[ -z "$ifn" ] && ifn=$(iw dev 2>/dev/null | awk '/Interface/{print $2; exit}')
+		echo -n "{\"radio\":\"$radio\",\"ifname\":\"$ifn\",\"survey\":["
+		iw dev "$ifn" survey dump 2>/dev/null | awk '
+			/frequency:/ { if (f) out(); f=$2; use=($0 ~ /in use/)?1:0; n=0; a=0; b=0 }
+			/noise:/ { n=$2 }
+			/channel active time:/ { a=$5 }
+			/channel busy time:/ { b=$5 }
+			function out() { printf "%s{\"freq\":%d,\"noise\":%d,\"active\":%d,\"busy\":%d,\"in_use\":%s}", (c++?",":""), f, n, a, b, use?"true":"false" }
+			END { if (f) out() }'
+		echo "]}"
+		;;
+	sysinfo)
+		json_init
+		json_add_string model "$(cat /tmp/sysinfo/model 2>/dev/null)"
+		json_add_string release "$(. /etc/openwrt_release; echo $DISTRIB_DESCRIPTION)"
+		json_add_string kernel "$(uname -r)"
+		json_add_int mem_total "$(awk '/MemTotal/{print $2}' /proc/meminfo)"
+		json_add_int mem_free "$(awk '/MemFree/{print $2}' /proc/meminfo)"
+		json_add_int mem_buffers "$(awk '/^Buffers/{print $2}' /proc/meminfo)"
+		json_add_int mem_cached "$(awk '/^Cached/{print $2}' /proc/meminfo)"
+		json_add_string load "$(cut -d' ' -f1-3 /proc/loadavg)"
+		json_add_int uptime "$(cut -d. -f1 /proc/uptime)"
+		json_add_int cpu_mhz 580
+		json_add_boolean cpu_fixed 1
+		json_add_string cpu "$(sed -n 's/^cpu model.*: //p' /proc/cpuinfo | head -n1)"
+		json_add_string flash "8 MB"
+		json_add_string ram "64 MB"
+		json_dump
+		;;
+	ports)
+		SW=$(uci -q get alameer.loopguard.switch); [ -z "$SW" ] && SW=switch0
+		json_init; json_add_array ports
+		for p in 0 1 2 3 4; do
+			l=$(swconfig dev $SW port $p get link 2>/dev/null)
+			json_add_object; json_add_int port $p; json_add_string link "$l"
+			case "$l" in *"link:up"*) json_add_boolean up 1;; *) json_add_boolean up 0;; esac
+			json_close_object
+		done
+		json_close_array; json_dump
+		;;
+	loopstatus)
+		if [ -f /tmp/alameer/ports.json ]; then
+			json_load "$(cat /tmp/alameer/ports.json)" 2>/dev/null
+			json_add_array events
+			[ -f /tmp/alameer/loop.log ] && tail -n 30 /tmp/alameer/loop.log | while IFS= read -r line; do json_add_string "" "$line"; done
+			json_close_array
+			json_dump
+		else
+			echo '{"ports":[],"events":[],"error":"loopguard not running"}'
+		fi
+		;;
+	esac
+	;;
+esac

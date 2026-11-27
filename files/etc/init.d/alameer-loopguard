@@ -1,0 +1,14 @@
+#!/bin/sh /etc/rc.common
+START=21
+USE_PROCD=1
+
+start_service() {
+	[ "$(uci -q get alameer.loopguard.enabled)" = "0" ] && return 0
+	# kernel-level protection
+	echo 1 > /sys/class/net/br-lan/bridge/stp_state 2>/dev/null
+	echo 1 > /sys/class/net/br-lan/bridge/multicast_snooping 2>/dev/null
+	procd_open_instance
+	procd_set_param command /usr/sbin/alameer-loopguard
+	procd_set_param respawn
+	procd_close_instance
+}

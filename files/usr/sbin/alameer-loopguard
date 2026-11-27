@@ -1,0 +1,74 @@
+#!/bin/sh
+# Alameer LoopGuard: per-port storm / loop detection with automatic isolation.
+# NOTE: per-port switch counters rely on `swconfig ... get mib` (best-effort on mt7620 esw).
+S=/tmp/alameer; mkdir -p $S; LOG=$S/loop.log; : > $S/dmesg.last
+g() { v=$(uci -q get alameer.loopguard.$1); echo "${v:-$2}"; }
+PPS_MAX=$(g pps_max 30000); MC_MAX=$(g mc_max 1500); STRIKES=$(g strikes 3)
+ISO=$(g isolate_secs 60); SW=$(g switch switch0); UPLINK=$(g uplink eth0.2)
+LANP=$(g lan_ports "0 1 2 3"); WANP=$(g wan_port 4)
+
+now() { cut -d. -f1 /proc/uptime; }
+log() { echo "$(date '+%F %T') $*" >> $LOG; logger -t alameer-loopguard "$*"; tail -n 100 $LOG > $LOG.t && mv $LOG.t $LOG; }
+id_of() { echo "$1" | tr '.:-' '___'; }
+sw_read() { # port -> "rx mc"
+	o=$(swconfig dev $SW port "$1" get mib 2>/dev/null)
+	rx=$(echo "$o" | awk '/Rx/ && /Pkt/ && !/Bad/ {print $NF; exit}')
+	mc=$(echo "$o" | awk '/Rx/ && /Multi/ {print $NF; exit}')
+	echo "${rx:-0} ${mc:-0}"
+}
+net_read() { echo "$(cat /sys/class/net/$1/statistics/rx_packets 2>/dev/null || echo 0) $(cat /sys/class/net/$1/statistics/multicast 2>/dev/null || echo 0)"; }
+is_uplink() { [ "$1" = "$UPLINK" ] || { [ "$1" = "p$WANP" ]; }; }
+
+isolate() { # name kind
+	n="$1"; k="$2"; is_uplink "$n" && return
+	[ -f $S/iso_$(id_of $n) ] && return
+	if [ "$k" = sw ]; then swconfig dev $SW port "${n#p}" set disable 1 2>/dev/null
+	else ip link set dev "$n" down; fi
+	echo "$(( $(now) + ISO ))" > $S/iso_$(id_of $n)
+	log "ISOLATED $n for ${ISO}s ($3)"
+}
+restore() {
+	for f in $S/iso_*; do [ -f "$f" ] || continue
+		[ "$(now)" -lt "$(cat $f)" ] && continue
+		n=$(basename $f | sed 's/^iso_//')
+		case "$n" in p[0-9]) swconfig dev $SW port "${n#p}" set disable 0 2>/dev/null;; *)
+			for d in /sys/class/net/*; do b=$(basename $d); [ "$(id_of $b)" = "$n" ] && ip link set dev $b up; done;; esac
+		rm -f $f; log "RESTORED $n"
+	done
+}
+list_targets() {
+	for p in $LANP; do echo "p$p sw"; done
+	for i in $(ls /sys/class/net/br-lan/brif 2>/dev/null); do case "$i" in wlan*|phy*|ra*|rai*|apcli*) echo "$i net";; esac; done
+}
+
+while :; do
+	JSON=""
+	list_targets > $S/targets
+	while read n k; do
+		i=$(id_of $n)
+		if [ "$k" = sw ]; then set -- $(sw_read "${n#p}"); else set -- $(net_read $n); fi
+		rx=$1; mc=$2
+		prx=$(cat $S/prx_$i 2>/dev/null || echo $rx); pmc=$(cat $S/pmc_$i 2>/dev/null || echo $mc)
+		echo $rx > $S/prx_$i; echo $mc > $S/pmc_$i
+		drx=$((rx-prx)); dmc=$((mc-pmc)); [ $drx -lt 0 ] && drx=0; [ $dmc -lt 0 ] && dmc=0
+		st=$(cat $S/st_$i 2>/dev/null || echo 0)
+		if [ $drx -gt $PPS_MAX ] || [ $dmc -gt $MC_MAX ]; then st=$((st+1)); else st=0; fi
+		echo $st > $S/st_$i
+		[ $st -ge $STRIKES ] && { isolate $n $k "rx=${drx}pps mc=${dmc}pps"; echo 0 > $S/st_$i; }
+		iso=false; [ -f $S/iso_$i ] && iso=true
+		JSON="${JSON}${JSON:+,}{\"name\":\"$n\",\"type\":\"$k\",\"rx_pps\":$drx,\"mc_pps\":$dmc,\"strikes\":$st,\"isolated\":$iso}"
+	done < $S/targets
+	# kernel loop signature
+	last=$(dmesg 2>/dev/null | grep 'own address as source address' | tail -n1)
+	if [ -n "$last" ] && [ "$last" != "$(cat $S/dmesg.last)" ]; then
+		echo "$last" > $S/dmesg.last
+		p=$(echo "$last" | sed -n 's/.*received packet on \([^ ]*\) with.*/\1/p')
+		if [ -n "$p" ]; then
+			case "$p" in eth0.1) log "LOOP signature on $p (VLAN trunk, cannot isolate individually)";;
+				*) isolate "$p" net "own-address-as-source";; esac
+		fi
+	fi
+	restore
+	echo "{\"ports\":[$JSON],\"limits\":{\"pps\":$PPS_MAX,\"mc\":$MC_MAX,\"strikes\":$STRIKES,\"isolate_secs\":$ISO},\"uplink\":\"$UPLINK\"}" > $S/ports.json
+	sleep 1
+done

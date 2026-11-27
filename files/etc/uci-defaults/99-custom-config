@@ -1,0 +1,57 @@
+#!/bin/sh
+# Alameer first-boot configuration. Runs once; never overrides user config after upgrade.
+[ "$(uci -q get alameer.main.initialized)" = "1" ] && exit 0
+
+touch /etc/config/alameer
+uci -q batch <<UCI
+set alameer.main=alameer
+set alameer.main.initialized='1'
+set alameer.main.ip='192.168.1.20'
+set alameer.main.netmask='255.255.255.0'
+set alameer.main.gateway='192.168.1.1'
+set alameer.main.country='US'
+set alameer.main.wifi_key='ChangeMe1234'
+set alameer.loopguard=loopguard
+set alameer.loopguard.enabled='1'
+set alameer.loopguard.uplink='eth0.2'
+set alameer.loopguard.pps_max='30000'
+set alameer.loopguard.mc_max='1500'
+set alameer.loopguard.strikes='3'
+set alameer.loopguard.isolate_secs='60'
+set alameer.loopguard.switch='switch0'
+set alameer.loopguard.lan_ports='0 1 2 3'
+set alameer.loopguard.wan_port='4'
+set alameer.superchannel=superchannel
+UCI
+
+uci -q set system.@system[0].hostname='Alameer-AP'
+
+# --- Network: 5-port switch + AP, static management IP, no DHCP ---
+for s in $(uci -q show network | sed -n "s/^\(network\.[^.]*\)\.name='br-lan'$/\1/p"); do
+	uci -q get "$s.ports" | grep -qw eth0.2 || uci add_list "$s.ports"='eth0.2'
+	uci -q set "$s.stp"='1'
+	uci -q set "$s.igmp_snooping"='1'
+done
+uci -q delete network.wan
+uci -q delete network.wan6
+uci -q batch <<UCI
+set network.lan.proto='static'
+set network.lan.ipaddr='192.168.1.20'
+set network.lan.netmask='255.255.255.0'
+set network.lan.gateway='192.168.1.1'
+delete network.lan.dns
+add_list network.lan.dns='192.168.1.1'
+set dhcp.lan.ignore='1'
+UCI
+uci -q delete dhcp.lan.start; uci -q delete dhcp.lan.limit
+
+uci commit network; uci commit dhcp; uci commit system; uci commit alameer
+
+# --- Wireless ---
+/usr/sbin/alameer-reset-wireless
+
+# --- Theme fallback (if build-time injection did not run) ---
+/usr/sbin/alameer-inject-theme 2>/dev/null
+
+/etc/init.d/alameer-loopguard enable
+exit 0

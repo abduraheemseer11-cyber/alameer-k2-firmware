@@ -1,0 +1,28 @@
+{
+	"admin/alameer": {
+		"title": "Alameer Tools",
+		"order": 90,
+		"action": { "type": "firstchild" },
+		"depends": { "acl": [ "luci-app-alameer" ] }
+	},
+	"admin/alameer/quicksetup": {
+		"title": "Quick Setup", "order": 1,
+		"action": { "type": "view", "path": "alameer/quicksetup" }
+	},
+	"admin/alameer/spectrum": {
+		"title": "WiFi Analyzer", "order": 2,
+		"action": { "type": "view", "path": "alameer/spectrum" }
+	},
+	"admin/alameer/superchannel": {
+		"title": "Super Channel", "order": 3,
+		"action": { "type": "view", "path": "alameer/superchannel" }
+	},
+	"admin/alameer/power": {
+		"title": "Performance", "order": 4,
+		"action": { "type": "view", "path": "alameer/power" }
+	},
+	"admin/alameer/loopguard": {
+		"title": "Loop Guard", "order": 5,
+		"action": { "type": "view", "path": "alameer/loopguard" }
+	}
+}
