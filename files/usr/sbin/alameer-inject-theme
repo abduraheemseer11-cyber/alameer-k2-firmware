@@ -1,6 +1,9 @@
 #!/bin/sh
-# Runtime fallback: inject alameer.css/js into the installed bootstrap header.
-for h in /usr/lib/lua/luci/view/themes/bootstrap/header.htm /usr/share/ucode/luci/template/themes/bootstrap/header.ut; do
+# Runtime fallback: inject alameer.css/js into the installed bootstrap header and sysauth pages.
+for h in /usr/lib/lua/luci/view/themes/bootstrap/header.htm \
+         /usr/lib/lua/luci/view/sysauth.htm \
+         /usr/share/ucode/luci/template/themes/bootstrap/header.ut \
+         /usr/share/ucode/luci/template/sysauth.ut; do
 	[ -f "$h" ] || continue
 	grep -q alameer.css "$h" && continue
 	sed -i '0,/<\/head>/s##<link rel="stylesheet" href="/luci-static/alameer/alameer.css?v=1">\n<script src="/luci-static/alameer/alameer.js?v=1" defer></script>\n</head>#' "$h"
