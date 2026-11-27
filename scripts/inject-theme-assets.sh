@@ -1,7 +1,5 @@
 #!/bin/bash
 # Usage: inject-theme-assets.sh <files-dir> <openwrt-version>
-# Downloads luci-theme-bootstrap ipk, extracts header.htm and sysauth.htm for 22.03.7 and
-# injects alameer.css / alameer.js before </head>, writing it into the overlay.
 set -euo pipefail
 FILES="$(cd "${1:?files dir}" && pwd)"; VER="${2:-22.03.7}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
@@ -12,7 +10,8 @@ FN=$(zcat "$TMP/Packages.gz" | awk '/^Package: luci-theme-bootstrap$/{f=1} f&&/^
 wget -q -O "$TMP/pkg.ipk" "$REPO/$FN"
 mkdir "$TMP/x" && cd "$TMP/x" && tar xzf ../pkg.ipk && mkdir d && tar -C d -xzf data.tar.gz
 
-INJ='<link rel="stylesheet" href="/luci-static/alameer/alameer.css?v=1">\n<script src="/luci-static/alameer/alameer.js?v=1" defer></script>\n</head>'
+# Updated to v=2 to break browser cache
+INJ='<link rel="stylesheet" href="/luci-static/alameer/alameer.css?v=2">\n<script src="/luci-static/alameer/alameer.js?v=2" defer></script>\n</head>'
 
 for p in usr/lib/lua/luci/view/themes/bootstrap/header.htm \
          usr/lib/lua/luci/view/sysauth.htm \
