@@ -14,6 +14,7 @@ setradio() { # radio channel htmode band
 	uci set wireless.$1.htmode="$3"
 	[ -n "$4" ] && uci set wireless.$1.band="$4"
 }
+
 addiface() { # name radio ssid
 	uci -q get wireless.$2 >/dev/null || return 0
 	uci set wireless.$1=wifi-iface
@@ -24,10 +25,31 @@ addiface() { # name radio ssid
 	uci set wireless.$1.encryption='psk2'
 	uci set wireless.$1.key="$KEY"
 }
-setradio radio0 6  HT20  2g
-setradio radio1 36 VHT80 5g
-addiface alameer_2g radio0 AbduRaheem_2G
-addiface alameer_5g radio1 AbduRaheem_5G
+
+# Dynamic mapping based on band
+for r in radio0 radio1; do
+	uci -q get wireless.$r >/dev/null || continue
+	b=$(uci -q get wireless.$r.band)
+	[ -z "$b" ] && b=$(uci -q get wireless.$r.hwmode)
+	if echo "$b" | grep -qE '2g|11g'; then
+		setradio "$r" 6 HT20 2g
+		addiface alameer_2g "$r" AbduRaheem_2G
+	elif echo "$b" | grep -qE '5g|11a'; then
+		setradio "$r" 36 VHT80 5g
+		addiface alameer_5g "$r" AbduRaheem_5G
+	fi
+done
+
+# Fallback for Phicomm K2 (radio1=2.4G, radio0=5G)
+if ! uci -q show wireless | grep -q 'alameer_2g'; then
+	setradio radio1 6 HT20 2g
+	addiface alameer_2g radio1 AbduRaheem_2G
+fi
+if ! uci -q show wireless | grep -q 'alameer_5g'; then
+	setradio radio0 36 VHT80 5g
+	addiface alameer_5g radio0 AbduRaheem_5G
+fi
+
 uci commit wireless
 wifi reload 2>/dev/null
 exit 0
