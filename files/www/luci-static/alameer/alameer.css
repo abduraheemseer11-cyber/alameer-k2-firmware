@@ -43,3 +43,16 @@ input,select,textarea,.cbi-input-text,.cbi-input-select{background:#0b1020!impor
 .al-on{color:#4ade80}.al-off{color:#f87171}
 canvas.al-canvas{width:100%;height:320px;background:#0b1020;border-radius:8px}
 @media(max-width:640px){#al-top .al-title{display:none}.al-row label{min-width:100%}}
+
+/* --- Login Page (sysauth) --- */
+body.sysauth { background: #0f1530 !important; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+body.sysauth #maincontent { width: 100%; max-width: 400px; background: #151d3d !important; padding: 40px 30px; border-radius: 12px; border: 1px solid #232c55; box-shadow: 0 10px 30px rgba(0,0,0,0.6); text-align: center; position: relative; }
+body.sysauth #maincontent::before { content: url('/luci-static/alameer/logo.png'); display: block; margin: 0 auto 20px auto; width: 140px; height: auto; }
+body.sysauth h2 { color: #fff !important; margin-bottom: 25px; font-size: 20px; font-weight: bold; }
+body.sysauth .cbi-value { display: block; margin-bottom: 15px; padding: 0; }
+body.sysauth .cbi-value-title { display: block; text-align: left; color: #8b93b5; font-size: 14px; margin-bottom: 5px; padding: 0; width: 100%; }
+body.sysauth .cbi-value-field { width: 100%; }
+body.sysauth .cbi-input-text { width: 100%; box-sizing: border-box; height: 45px; background: #0b1020 !important; border: 1px solid #2c3766 !important; border-radius: 6px; color: #fff; padding: 0 15px; }
+body.sysauth .cbi-button-apply { width: 100%; height: 45px; font-size: 16px; font-weight: bold; margin-top: 15px; background: var(--al-pri) !important; border: none; border-radius: 6px; cursor: pointer; color: #fff; }
+body.sysauth .cbi-button-apply:hover { background: #5a3de0 !important; }
+body.sysauth .alert-message { text-align: left; margin-bottom: 15px; background: #b42318; color: #fff; padding: 10px; border-radius: 6px; }
