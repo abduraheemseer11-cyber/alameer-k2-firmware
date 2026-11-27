@@ -7,25 +7,44 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         profile: [phicomm_k2-v22.4, phicomm_k2-v22.5]
     steps:
       - uses: actions/checkout@v4
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses5-dev gawk gettext unzip file wget python3 zstd xz-utils curl
+
+      - name: Download and extract ImageBuilder
+        env:
+          OPENWRT_VERSION: "24.10.8"
+          TARGET: ramips
+          SUBTARGET: mt7620
+        run: |
+          set -euo pipefail
+          IB="openwrt-imagebuilder-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}.Linux-x86_64"
+          URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/${IB}.tar.zst"
+          echo "Downloading: $URL"
+          curl --fail --location --retry 3 "$URL" -o imagebuilder.tar.zst
+          mkdir -p imagebuilder
+          tar --use-compress-program=unzstd -xf imagebuilder.tar.zst -C imagebuilder --strip-components=1
+          test -f imagebuilder/Makefile
+          echo "IMAGEBUILDER=$PWD/imagebuilder" >> "$GITHUB_ENV"
+
       - name: Build image (${{ matrix.profile }})
         env:
           PROFILE: ${{ matrix.profile }}
-          MAX_IMAGE_BYTES: 6500000
+          MAX_IMAGE_BYTES: 7500000
           BUILD_REGDB: "0"
         run: |
           chmod +x scripts/*.sh files/usr/sbin/* files/etc/init.d/* files/etc/uci-defaults/* files/usr/libexec/rpcd/*
           ./scripts/build-image.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: alameer-${{ matrix.profile }}
