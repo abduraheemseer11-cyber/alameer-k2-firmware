@@ -6,6 +6,6 @@ for h in /usr/lib/lua/luci/view/themes/bootstrap/header.htm \
          /usr/share/ucode/luci/template/sysauth.ut; do
 	[ -f "$h" ] || continue
 	grep -q alameer.css "$h" && continue
-	sed -i '0,/<\/head>/s##<link rel="stylesheet" href="/luci-static/alameer/alameer.css?v=1">\n<script src="/luci-static/alameer/alameer.js?v=1" defer></script>\n</head>#' "$h"
+	sed -i '0,/<\/head>/s##<link rel="stylesheet" href="/luci-static/alameer/alameer.css?v=2">\n<script src="/luci-static/alameer/alameer.js?v=2" defer></script>\n</head>#' "$h"
 done
 exit 0
